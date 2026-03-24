@@ -1,72 +1,127 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import yt_dlp
 import os
 
-TOKEN = "8307650303:AAFJGrwoOeb73dOedEeYLDdqddyE1N65Ckg"
+TOKEN = os.getenv("TOKEN")
 
+# ===== MENU =====
+keyboard = [
+    ["🎬 Download Video", "🎧 Convert to MP3"],
+    ["🔄 Reset"]
+]
 
-# START MENU
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("🎬 Download Video", callback_data='video')],
-        [InlineKeyboardButton("🎵 Download Audio", callback_data='audio')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-    await update.message.reply_text("Pilih menu:", reply_markup=reply_markup)
+# ===== CLEAN URL =====
+def clean_url(url):
+    return url.split("?")[0]
 
-# HANDLE BUTTON
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    context.user_data["mode"] = query.data
-
-    await query.edit_message_text("Kirim link sekarang...")
-
-# HANDLE LINK
-async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    url = update.message.text
-    mode = context.user_data.get("mode")
-
-    await update.message.reply_text("⏳ Processing...")
-
-    try:
-        if mode == "audio":
-            ydl_opts = {
-                'format': 'bestaudio',
-                'outtmpl': 'audio.%(ext)s',
-            }
-        else:
-            ydl_opts = {
-                'format': 'mp4',
+# ===== GET OPTIONS =====
+def get_opts(mode, quality="best"):
+    if mode == "audio":
+        return {
+            'format': 'bestaudio',
+            'outtmpl': 'audio.%(ext)s',
+            'quiet': True
+        }
+    else:
+        if quality == "hd":
+            return {
+                'format': 'bestvideo[height<=1080]+bestaudio/best',
                 'outtmpl': 'video.%(ext)s',
+                'quiet': True
+            }
+        else:
+            return {
+                'format': 'best',
+                'outtmpl': 'video.%(ext)s',
+                'quiet': True
             }
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+# ===== START =====
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "✨ *Ipun Downloader Pro*\n\n"
+        "⚡ Cepat • Tanpa Ribet • Kualitas Tinggi\n\n"
+        "📥 Support:\nTikTok • YouTube • Instagram • Facebook\n\n"
+        "👇 Pilih menu atau langsung kirim link",
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
 
-        if mode == "audio":
-            file = [f for f in os.listdir() if f.startswith("audio")][0]
-            with open(file, "rb") as f:
-                await update.message.reply_audio(audio=f)
-            os.remove(file)
-        else:
-            with open("video.mp4", "rb") as f:
-                await update.message.reply_video(video=f)
-            os.remove("video.mp4")
+# ===== MAIN HANDLER =====
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
 
-    except Exception as e:
-        print(e)
-        await update.message.reply_text("❌ Gagal")
+    # ===== MODE =====
+    if text == "🎬 Download Video":
+        context.user_data["mode"] = "video"
+        await update.message.reply_text("🔗 Kirim link video")
 
-# RUN BOT
+    elif text == "🎧 Convert to MP3":
+        context.user_data["mode"] = "audio"
+        await update.message.reply_text("🎧 Kirim link untuk MP3")
+
+    elif text == "🔄 Reset":
+        context.user_data.clear()
+        await update.message.reply_text("♻️ Mode direset")
+
+    # ===== HANDLE LINK =====
+    elif text.startswith("http"):
+        mode = context.user_data.get("mode")
+
+        if not mode:
+            await update.message.reply_text("⚠️ Pilih menu dulu ya 👇")
+            return
+
+        url = clean_url(text)
+        msg = await update.message.reply_text("⏳ Mengambil data...")
+
+        try:
+            # ambil info video
+            with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+                info = ydl.extract_info(url, download=False)
+                title = info.get("title", "Media")
+
+            await msg.edit_text(f"📥 Downloading:\n{title}")
+
+            # coba HD dulu
+            try:
+                ydl_opts = get_opts(mode, "hd")
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([url])
+            except:
+                # fallback
+                ydl_opts = get_opts(mode, "best")
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([url])
+
+            await msg.edit_text("📤 Mengirim file...")
+
+            # ===== KIRIM FILE =====
+            if mode == "audio":
+                file = [f for f in os.listdir() if f.startswith("audio")][0]
+                with open(file, "rb") as f:
+                    await update.message.reply_audio(audio=f, title=title)
+                os.remove(file)
+
+            else:
+                file = [f for f in os.listdir() if f.startswith("video")][0]
+                with open(file, "rb") as f:
+                    await update.message.reply_video(video=f, caption=f"🎬 {title}")
+                os.remove(file)
+
+            await msg.edit_text("✅ Selesai!")
+
+        except Exception as e:
+            print(e)
+            await msg.edit_text("❌ Gagal, coba link lain")
+
+# ===== RUN =====
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
-app.add_handler(CallbackQueryHandler(button))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_link))
+app.add_handler(MessageHandler(filters.TEXT, handle_message))
 
 app.run_polling()
-
