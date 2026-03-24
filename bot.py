@@ -60,7 +60,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 title = info.get("title", "Media")
 
             # ===== AUDIO =====
-            if mode == "audio":
+if mode == "audio":
     try:
         # 1. Download video dulu
         ydl_opts = {
