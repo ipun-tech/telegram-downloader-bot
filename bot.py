@@ -66,16 +66,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # ===== DOWNLOAD =====
             if mode == "audio":
                 try:
-                    ydl_opts = {
-                        'format': 'bestaudio/best',
-                        'outtmpl': 'audio.%(ext)s',
-                        'postprocessors': [{
-                            'key': 'FFmpegExtractAudio',
-                            'preferredcodec': 'mp3',
-                            'preferredquality': '192',
-                        }],
-                        'quiet': True
-                    }
+                   ydl_opts = {
+    'format': 'bestaudio[ext=m4a]/bestaudio/best',
+    'outtmpl': 'audio.%(ext)s',
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192',
+    }],
+    'quiet': True
+}
 
                     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                         ydl.download([url])
