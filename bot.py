@@ -59,36 +59,35 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 info = ydl.extract_info(url, download=False)
                 title = info.get("title", "Media")
 
-            # ===== AUDIO =====
-if mode == "audio":
-    try:
-        # 1. Download video dulu
-        ydl_opts = {
-            'format': 'best',
-            'outtmpl': 'video.%(ext)s',
-            'quiet': True
-        }
+                    # ===== AUDIO =====
+        if mode == "audio":
+            try:
+                # 1. Download video dulu
+                ydl_opts = {
+                    'format': 'best',
+                    'outtmpl': 'video.%(ext)s',
+                    'quiet': True
+                }
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([url])
 
-        file = [f for f in os.listdir() if f.startswith("video")][0]
+                file = [f for f in os.listdir() if f.startswith("video")][0]
 
-        # 2. Convert ke MP3 pakai ffmpeg
-        mp3_file = "audio.mp3"
-        os.system(f'ffmpeg -i "{file}" -vn -ab 192k -ar 44100 -y "{mp3_file}"')
+                # 2. Convert ke MP3
+                mp3_file = "audio.mp3"
+                os.system(f'ffmpeg -i "{file}" -vn -ab 192k -ar 44100 -y "{mp3_file}"')
 
-        # 3. Kirim ke user
-        with open(mp3_file, "rb") as f:
-            await update.message.reply_audio(audio=f, title=title)
+                # 3. Kirim
+                with open(mp3_file, "rb") as f:
+                    await update.message.reply_audio(audio=f, title=title)
 
-        # 4. Hapus file
-        os.remove(file)
-        os.remove(mp3_file)
+                os.remove(file)
+                os.remove(mp3_file)
 
-    except Exception as e:
-        print(e)
-        await update.message.reply_text("❌ Gagal convert MP3")
+            except Exception as e:
+                print(e)
+                await update.message.reply_text("❌ Gagal convert MP3")
                     return
 
                 with open("audio.mp3", "rb") as f:
@@ -132,3 +131,4 @@ app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
 app.run_polling()
+
