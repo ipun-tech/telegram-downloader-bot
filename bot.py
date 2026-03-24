@@ -26,7 +26,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
     # ===== MODE =====
-    if "Video" in text:
+if "Video" in text:
     context.user_data["mode"] = "video"
     await update.message.reply_text("🔗 Kirim link video")
 
