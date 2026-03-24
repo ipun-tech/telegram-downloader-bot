@@ -25,7 +25,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    # ===== MODE =====
+# ===== MODE =====
 if "Video" in text:
     context.user_data["mode"] = "video"
     await update.message.reply_text("🔗 Kirim link video")
@@ -37,7 +37,6 @@ elif "MP3" in text:
 elif "Reset" in text:
     context.user_data.clear()
     await update.message.reply_text("♻️ Reset")
-
     # ===== HANDLE LINK =====
     elif text.startswith("http"):
         mode = context.user_data.get("mode")
