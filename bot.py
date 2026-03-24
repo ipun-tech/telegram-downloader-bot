@@ -7,109 +7,59 @@ TOKEN = os.getenv("TOKEN")
 
 # ===== MENU =====
 keyboard = [
-    ["🎬 Download Video", "🎧 Convert to MP3"],
+    ["🎬 Video", "🎧 MP3"],
     ["🔄 Reset"]
 ]
-
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-# ===== CLEAN URL =====
 def clean_url(url):
     return url.split("?")[0]
 
-# ===== START =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "✨ *Ipun Downloader Pro*\n\n"
-        "📥 TikTok • YouTube • IG • FB\n\n"
-        "👇 Pilih menu atau kirim link langsung",
-        parse_mode="Markdown",
+        "✨ Ipun Downloader Pro\n\n"
+        "Pilih menu lalu kirim link",
         reply_markup=reply_markup
     )
 
-# ===== MAIN =====
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
     # ===== MODE =====
-    if text == "🎬 Download Video":
+    if text == "🎬 Video":
         context.user_data["mode"] = "video"
         await update.message.reply_text("🔗 Kirim link video")
 
-    elif text == "🎧 Convert to MP3":
+    elif text == "🎧 MP3":
         context.user_data["mode"] = "audio"
         await update.message.reply_text("🎧 Kirim link untuk MP3")
 
     elif text == "🔄 Reset":
         context.user_data.clear()
-        await update.message.reply_text("♻️ Mode direset")
+        await update.message.reply_text("♻️ Reset")
 
     # ===== HANDLE LINK =====
     elif text.startswith("http"):
         mode = context.user_data.get("mode")
 
         if not mode:
-            await update.message.reply_text("⚠️ Pilih menu dulu ya 👇")
+            await update.message.reply_text("⚠️ Pilih menu dulu")
             return
 
         url = clean_url(text)
-        msg = await update.message.reply_text("⏳ Mengambil data...")
+        msg = await update.message.reply_text("⏳ Processing...")
 
         try:
-            # ambil info video
+            # ===== AMBIL JUDUL =====
             with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
                 info = ydl.extract_info(url, download=False)
                 title = info.get("title", "Media")
 
-            await msg.edit_text(f"📥 Downloading:\n{title}")
-
-            # ===== DOWNLOAD =====
+            # ===== MODE AUDIO =====
             if mode == "audio":
-    try:
-        # download video dulu
-        ydl_opts = {
-            'format': 'best',
-            'outtmpl': 'video.%(ext)s',
-            'quiet': True
-        }
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-
-        video_file = [f for f in os.listdir() if f.startswith("video")][0]
-
-        # convert ke mp3 pakai ffmpeg
-        os.system(f'ffmpeg -i "{video_file}" -vn -ab 192k -ar 44100 -y audio.mp3')
-
-        with open("audio.mp3", "rb") as f:
-            await update.message.reply_audio(f)
-
-        os.remove(video_file)
-        os.remove("audio.mp3")
-
-    except Exception as e:
-        print("ERROR:", e)
-        await update.message.reply_text("❌ Gagal convert")
-
-                    ydl_opts = {
-                        'format': 'best',
-                        'outtmpl': 'video.%(ext)s',
-                        'quiet': True
-                    }
-
-                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        ydl.download([url])
-
-                    file = [f for f in os.listdir() if f.startswith("video")][0]
-
-                    with open(file, "rb") as f:
-                        await update.message.reply_video(video=f, caption=f"🎬 {title}")
-
-                    os.remove(file)
-
-            else:
+                # download video dulu (lebih stabil)
                 ydl_opts = {
-                    'format': 'bestvideo+bestaudio/best',
+                    'format': 'best',
                     'outtmpl': 'video.%(ext)s',
                     'quiet': True
                 }
@@ -117,12 +67,46 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.download([url])
 
-                file = [f for f in os.listdir() if f.startswith("video")][0]
+                video_file = next((f for f in os.listdir() if f.startswith("video")), None)
 
-                with open(file, "rb") as f:
-                    await update.message.reply_video(video=f, caption=f"🎬 {title}")
+                if not video_file:
+                    await msg.edit_text("❌ Video tidak ditemukan")
+                    return
 
-                os.remove(file)
+                # convert ke mp3 (WAJIB ffmpeg)
+                os.system(f'ffmpeg -i "{video_file}" -vn -ab 192k -ar 44100 -y audio.mp3')
+
+                if not os.path.exists("audio.mp3"):
+                    await msg.edit_text("❌ Gagal convert MP3")
+                    return
+
+                with open("audio.mp3", "rb") as f:
+                    await update.message.reply_audio(f, title=title)
+
+                os.remove(video_file)
+                os.remove("audio.mp3")
+
+            # ===== MODE VIDEO =====
+            else:
+                ydl_opts = {
+                    'format': 'best',
+                    'outtmpl': 'video.%(ext)s',
+                    'quiet': True
+                }
+
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([url])
+
+                video_file = next((f for f in os.listdir() if f.startswith("video")), None)
+
+                if not video_file:
+                    await msg.edit_text("❌ Video tidak ditemukan")
+                    return
+
+                with open(video_file, "rb") as f:
+                    await update.message.reply_video(f, caption=f"🎬 {title}")
+
+                os.remove(video_file)
 
             await msg.edit_text("✅ Selesai!")
 
@@ -132,8 +116,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ===== RUN =====
 app = ApplicationBuilder().token(TOKEN).build()
-
 app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT, handle_message))
-
+app.add_handler(MessageHandler(filters.TEXT, handle))
 app.run_polling()
