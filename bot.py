@@ -26,17 +26,17 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
     # ===== MODE =====
-    if text == "🎬 Video":
-        context.user_data["mode"] = "video"
-        await update.message.reply_text("🔗 Kirim link video")
+    if "Video" in text:
+    context.user_data["mode"] = "video"
+    await update.message.reply_text("🔗 Kirim link video")
 
-    elif text == "🎧 MP3":
-        context.user_data["mode"] = "audio"
-        await update.message.reply_text("🎧 Kirim link untuk MP3")
+elif "MP3" in text:
+    context.user_data["mode"] = "audio"
+    await update.message.reply_text("🎧 Kirim link untuk MP3")
 
-    elif text == "🔄 Reset":
-        context.user_data.clear()
-        await update.message.reply_text("♻️ Reset")
+elif "Reset" in text:
+    context.user_data.clear()
+    await update.message.reply_text("♻️ Reset")
 
     # ===== HANDLE LINK =====
     elif text.startswith("http"):
