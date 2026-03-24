@@ -102,21 +102,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # ===== KIRIM FILE =====
 if mode == "audio":
     try:
-        # ===== COBA DOWNLOAD MP3 =====
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': 'audio.%(ext)s',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-            'quiet': True
-        }
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-
         file = [f for f in os.listdir() if f.endswith(".mp3")][0]
 
         with open(file, "rb") as f:
@@ -125,19 +110,10 @@ if mode == "audio":
         os.remove(file)
 
     except Exception as e:
-        print(e)  # ini buat kamu lihat error di logs
+        print(e)
 
-        # ===== FALLBACK =====
+        # fallback ke video
         await update.message.reply_text("⚠️ MP3 gagal, kirim video...")
-
-        ydl_opts = {
-            'format': 'best',
-            'outtmpl': 'video.%(ext)s',
-            'quiet': True
-        }
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
 
         file = [f for f in os.listdir() if f.startswith("video")][0]
 
@@ -145,6 +121,16 @@ if mode == "audio":
             await update.message.reply_video(video=f, caption=f"🎬 {title}")
 
         os.remove(file)
+
+else:
+    file = [f for f in os.listdir() if f.startswith("video")][0]
+
+    with open(file, "rb") as f:
+        await update.message.reply_video(video=f, caption=f"🎬 {title}")
+
+    os.remove(file)
+
+await msg.edit_text("✅ Selesai!")
 
     except:
         # ===== FALLBACK KE VIDEO =====
