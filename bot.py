@@ -59,42 +59,39 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 info = ydl.extract_info(url, download=False)
                 title = info.get("title", "Media")
 
-                    # ===== AUDIO =====
-        if mode == "audio":
-            try:
-                # 1. Download video dulu
-                ydl_opts = {
-                    'format': 'best',
-                    'outtmpl': 'video.%(ext)s',
-                    'quiet': True
-                }
+            # ===== AUDIO =====
+            if mode == "audio":
+                try:
+                    # 1. Download video dulu
+                    ydl_opts = {
+                        'format': 'best',
+                        'outtmpl': 'video.%(ext)s',
+                        'quiet': True
+                    }
 
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url])
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        ydl.download([url])
 
-                file = [f for f in os.listdir() if f.startswith("video")][0]
+                    video_file = next((f for f in os.listdir() if f.startswith("video")), None)
 
-                # 2. Convert ke MP3
-                mp3_file = "audio.mp3"
-                os.system(f'ffmpeg -i "{file}" -vn -ab 192k -ar 44100 -y "{mp3_file}"')
+                    if not video_file:
+                        await msg.edit_text("❌ Video tidak ditemukan")
+                        return
 
-                # 3. Kirim
-                with open(mp3_file, "rb") as f:
-                    await update.message.reply_audio(audio=f, title=title)
+                    # 2. Convert ke MP3 pakai ffmpeg
+                    mp3_file = "audio.mp3"
+                    os.system(f'ffmpeg -i "{video_file}" -vn -ab 192k -ar 44100 -y "{mp3_file}"')
 
-                os.remove(file)
-                os.remove(mp3_file)
+                    # 3. Kirim
+                    with open(mp3_file, "rb") as f:
+                        await update.message.reply_audio(audio=f, title=title)
 
-            except Exception as e:
-                print(e)
-                await update.message.reply_text("❌ Gagal convert MP3")
-                    return
+                    os.remove(video_file)
+                    os.remove(mp3_file)
 
-                with open("audio.mp3", "rb") as f:
-                    await update.message.reply_audio(f, title=title)
-
-                os.remove(video_file)
-                os.remove("audio.mp3")
+                except Exception as e:
+                    print("MP3 ERROR:", e)
+                    await update.message.reply_text("❌ Gagal convert MP3")
 
             # ===== VIDEO =====
             else:
@@ -114,7 +111,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     return
 
                 with open(video_file, "rb") as f:
-                    await update.message.reply_video(f, caption=f"🎬 {title}")
+                    await update.message.reply_video(video=f, caption=f"🎬 {title}")
 
                 os.remove(video_file)
 
@@ -131,4 +128,3 @@ app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
 app.run_polling()
-
