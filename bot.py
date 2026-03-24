@@ -80,33 +80,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
-                    file = [f for f in os.listdir() if f.endswith(".mp3")][0]
+        file = [f for f in os.listdir() if f.endswith(".mp3")][0]
 
-                    with open(file, "rb") as f:
-                        await update.message.reply_audio(audio=f, title=title)
+        with open(file, "rb") as f:
+            await update.message.reply_audio(audio=f, title=title)
 
-                    os.remove(file)
+        os.remove(file)
 
-                except Exception as e:
-                    print("MP3 ERROR:", e)
+    except Exception as e:
+        print(e)
+        await update.message.reply_text("⚠️ MP3 gagal, kirim video...")
 
-                    await update.message.reply_text("⚠️ MP3 gagal, kirim video...")
+        ydl_opts = {
+            'format': 'best',
+            'outtmpl': 'video.%(ext)s',
+            'quiet': True
+        }
 
-                    ydl_opts = {
-                        'format': 'best',
-                        'outtmpl': 'video.%(ext)s',
-                        'quiet': True
-                    }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
 
-                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        ydl.download([url])
+        file = [f for f in os.listdir() if f.startswith("video")][0]
 
-                    file = [f for f in os.listdir() if f.startswith("video")][0]
+        with open(file, "rb") as f:
+            await update.message.reply_video(video=f, caption=f"🎬 {title}")
 
-                    with open(file, "rb") as f:
-                        await update.message.reply_video(video=f, caption=f"🎬 {title}")
-
-                    os.remove(file)
+        os.remove(file)
 
             else:
                 ydl_opts = {
