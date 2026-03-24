@@ -17,40 +17,17 @@ reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 def clean_url(url):
     return url.split("?")[0]
 
-# ===== GET OPTIONS =====
-def get_opts(mode, quality="best"):
-    if mode == "audio":
-        return {
-            'format': 'bestaudio',
-            'outtmpl': 'audio.%(ext)s',
-            'quiet': True
-        }
-    else:
-        if quality == "hd":
-            return {
-                'format': 'bestvideo[height<=1080]+bestaudio/best',
-                'outtmpl': 'video.%(ext)s',
-                'quiet': True
-            }
-        else:
-            return {
-                'format': 'best',
-                'outtmpl': 'video.%(ext)s',
-                'quiet': True
-            }
-
 # ===== START =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "✨ *Ipun Downloader Pro*\n\n"
-        "⚡ Cepat • Tanpa Ribet • Kualitas Tinggi\n\n"
-        "📥 Support:\nTikTok • YouTube • Instagram • Facebook\n\n"
-        "👇 Pilih menu atau langsung kirim link",
+        "📥 TikTok • YouTube • IG • FB\n\n"
+        "👇 Pilih menu atau kirim link langsung",
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
 
-# ===== MAIN HANDLER =====
+# ===== MAIN =====
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
@@ -86,71 +63,73 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             await msg.edit_text(f"📥 Downloading:\n{title}")
 
-            # coba HD dulu
-            try:
-                ydl_opts = get_opts(mode, "hd")
+            # ===== DOWNLOAD =====
+            if mode == "audio":
+                try:
+                    ydl_opts = {
+                        'format': 'bestaudio/best',
+                        'outtmpl': 'audio.%(ext)s',
+                        'postprocessors': [{
+                            'key': 'FFmpegExtractAudio',
+                            'preferredcodec': 'mp3',
+                            'preferredquality': '192',
+                        }],
+                        'quiet': True
+                    }
+
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        ydl.download([url])
+
+                    file = [f for f in os.listdir() if f.endswith(".mp3")][0]
+
+                    with open(file, "rb") as f:
+                        await update.message.reply_audio(audio=f, title=title)
+
+                    os.remove(file)
+
+                except Exception as e:
+                    print("MP3 ERROR:", e)
+
+                    await update.message.reply_text("⚠️ MP3 gagal, kirim video...")
+
+                    ydl_opts = {
+                        'format': 'best',
+                        'outtmpl': 'video.%(ext)s',
+                        'quiet': True
+                    }
+
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        ydl.download([url])
+
+                    file = [f for f in os.listdir() if f.startswith("video")][0]
+
+                    with open(file, "rb") as f:
+                        await update.message.reply_video(video=f, caption=f"🎬 {title}")
+
+                    os.remove(file)
+
+            else:
+                ydl_opts = {
+                    'format': 'bestvideo+bestaudio/best',
+                    'outtmpl': 'video.%(ext)s',
+                    'quiet': True
+                }
+
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.download([url])
-            except:
-                # fallback
-                ydl_opts = get_opts(mode, "best")
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url])
 
-            await msg.edit_text("📤 Mengirim file...")
+                file = [f for f in os.listdir() if f.startswith("video")][0]
 
-            # ===== KIRIM FILE =====
-if mode == "audio":
-    try:
-        file = [f for f in os.listdir() if f.endswith(".mp3")][0]
+                with open(file, "rb") as f:
+                    await update.message.reply_video(video=f, caption=f"🎬 {title}")
 
-        with open(file, "rb") as f:
-            await update.message.reply_audio(audio=f, title=title)
+                os.remove(file)
 
-        os.remove(file)
+            await msg.edit_text("✅ Selesai!")
 
-    except Exception as e:
-        print(e)
-
-        # fallback ke video
-        await update.message.reply_text("⚠️ MP3 gagal, kirim video...")
-
-        file = [f for f in os.listdir() if f.startswith("video")][0]
-
-        with open(file, "rb") as f:
-            await update.message.reply_video(video=f, caption=f"🎬 {title}")
-
-        os.remove(file)
-
-else:
-    file = [f for f in os.listdir() if f.startswith("video")][0]
-
-    with open(file, "rb") as f:
-        await update.message.reply_video(video=f, caption=f"🎬 {title}")
-
-    os.remove(file)
-
-await msg.edit_text("✅ Selesai!")
-
-    except:
-        # ===== FALLBACK KE VIDEO =====
-        await update.message.reply_text("⚠️ MP3 tidak tersedia, mengirim video...")
-
-        ydl_opts = {
-            'format': 'best',
-            'outtmpl': 'video.%(ext)s',
-            'quiet': True
-        }
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-
-        file = [f for f in os.listdir() if f.startswith("video")][0]
-
-        with open(file, "rb") as f:
-            await update.message.reply_video(video=f, caption=f"🎬 {title}")
-
-        os.remove(file)
+        except Exception as e:
+            print("ERROR:", e)
+            await msg.edit_text("❌ Gagal, coba link lain")
 
 # ===== RUN =====
 app = ApplicationBuilder().token(TOKEN).build()
