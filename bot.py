@@ -64,21 +64,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.edit_text(f"📥 Downloading:\n{title}")
 
             # ===== DOWNLOAD =====
-            if mode == "audio":
-                try:
-                   ydl_opts = {
-    'format': 'bestaudio[ext=m4a]/bestaudio/best',
-    'outtmpl': 'audio.%(ext)s',
-    'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192',
-    }],
-    'quiet': True
-}
+           if mode == "audio":
+    try:
+        ydl_opts = {
+            'format': 'bestaudio[ext=m4a]/bestaudio/best',
+            'outtmpl': 'audio.%(ext)s',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'quiet': True
+        }
 
-                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        ydl.download([url])
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
 
                     file = [f for f in os.listdir() if f.endswith(".mp3")][0]
 
