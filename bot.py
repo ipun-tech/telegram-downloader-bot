@@ -7,7 +7,7 @@ TOKEN = os.getenv("TOKEN")
 
 # ===== MENU =====
 keyboard = [
-    ["🎬 Video", "🎧 MP3"],
+    ["🎬 Download Video", "🎧 Convert to MP3"],
     ["🔄 Reset"]
 ]
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -15,28 +15,33 @@ reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 def clean_url(url):
     return url.split("?")[0]
 
+# ===== START =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "✨ Ipun Downloader Pro\n\n"
-        "Pilih menu lalu kirim link",
+        "✨ Ipun Downloader Pro\n\nPilih menu lalu kirim link",
         reply_markup=reply_markup
     )
 
+# ===== MAIN =====
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-# ===== MODE =====
-if "Video" in text:
-    context.user_data["mode"] = "video"
-    await update.message.reply_text("🔗 Kirim link video")
+    # ===== MODE =====
+    if "Video" in text:
+        context.user_data["mode"] = "video"
+        await update.message.reply_text("🔗 Kirim link video")
+        return
 
-elif "MP3" in text:
-    context.user_data["mode"] = "audio"
-    await update.message.reply_text("🎧 Kirim link untuk MP3")
+    elif "MP3" in text:
+        context.user_data["mode"] = "audio"
+        await update.message.reply_text("🎧 Kirim link untuk MP3")
+        return
 
-elif "Reset" in text:
-    context.user_data.clear()
-    await update.message.reply_text("♻️ Reset")
+    elif "Reset" in text:
+        context.user_data.clear()
+        await update.message.reply_text("♻️ Reset")
+        return
+
     # ===== HANDLE LINK =====
     elif text.startswith("http"):
         mode = context.user_data.get("mode")
@@ -49,14 +54,13 @@ elif "Reset" in text:
         msg = await update.message.reply_text("⏳ Processing...")
 
         try:
-            # ===== AMBIL JUDUL =====
+            # ambil judul
             with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
                 info = ydl.extract_info(url, download=False)
                 title = info.get("title", "Media")
 
-            # ===== MODE AUDIO =====
+            # ===== AUDIO =====
             if mode == "audio":
-                # download video dulu (lebih stabil)
                 ydl_opts = {
                     'format': 'best',
                     'outtmpl': 'video.%(ext)s',
@@ -72,7 +76,7 @@ elif "Reset" in text:
                     await msg.edit_text("❌ Video tidak ditemukan")
                     return
 
-                # convert ke mp3 (WAJIB ffmpeg)
+                # convert ke mp3 (butuh ffmpeg)
                 os.system(f'ffmpeg -i "{video_file}" -vn -ab 192k -ar 44100 -y audio.mp3')
 
                 if not os.path.exists("audio.mp3"):
@@ -85,7 +89,7 @@ elif "Reset" in text:
                 os.remove(video_file)
                 os.remove("audio.mp3")
 
-            # ===== MODE VIDEO =====
+            # ===== VIDEO =====
             else:
                 ydl_opts = {
                     'format': 'best',
@@ -115,6 +119,8 @@ elif "Reset" in text:
 
 # ===== RUN =====
 app = ApplicationBuilder().token(TOKEN).build()
+
 app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
+
 app.run_polling()
