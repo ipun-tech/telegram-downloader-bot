@@ -65,31 +65,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # ===== DOWNLOAD =====
             if mode == "audio":
-                try:
-                    ydl_opts = {
-                        'format': 'bestaudio[ext=m4a]/bestaudio/best',
-                        'outtmpl': 'audio.%(ext)s',
-                        'postprocessors': [{
-                            'key': 'FFmpegExtractAudio',
-                            'preferredcodec': 'mp3',
-                            'preferredquality': '192',
-                        }],
-                        'quiet': True
-                    }
+    try:
+        # download video dulu
+        ydl_opts = {
+            'format': 'best',
+            'outtmpl': 'video.%(ext)s',
+            'quiet': True
+        }
 
-                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        ydl.download([url])
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
 
-                    file = [f for f in os.listdir() if f.endswith(".mp3")][0]
+        video_file = [f for f in os.listdir() if f.startswith("video")][0]
 
-                    with open(file, "rb") as f:
-                        await update.message.reply_audio(audio=f, title=title)
+        # convert ke mp3 pakai ffmpeg
+        os.system(f'ffmpeg -i "{video_file}" -vn -ab 192k -ar 44100 -y audio.mp3')
 
-                    os.remove(file)
+        with open("audio.mp3", "rb") as f:
+            await update.message.reply_audio(f)
 
-                except Exception as e:
-                    print("MP3 ERROR:", e)
-                    await update.message.reply_text("⚠️ MP3 gagal, kirim video...")
+        os.remove(video_file)
+        os.remove("audio.mp3")
+
+    except Exception as e:
+        print("ERROR:", e)
+        await update.message.reply_text("❌ Gagal convert")
 
                     ydl_opts = {
                         'format': 'best',
