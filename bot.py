@@ -100,23 +100,71 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.edit_text("📤 Mengirim file...")
 
             # ===== KIRIM FILE =====
-            if mode == "audio":
-                file = [f for f in os.listdir() if f.startswith("audio")][0]
-                with open(file, "rb") as f:
-                    await update.message.reply_audio(audio=f, title=title)
-                os.remove(file)
+if mode == "audio":
+    try:
+        # ===== COBA DOWNLOAD MP3 =====
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': 'audio.%(ext)s',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'quiet': True
+        }
 
-            else:
-                file = [f for f in os.listdir() if f.startswith("video")][0]
-                with open(file, "rb") as f:
-                    await update.message.reply_video(video=f, caption=f"🎬 {title}")
-                os.remove(file)
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
 
-            await msg.edit_text("✅ Selesai!")
+        file = [f for f in os.listdir() if f.endswith(".mp3")][0]
 
-        except Exception as e:
-            print(e)
-            await msg.edit_text("❌ Gagal, coba link lain")
+        with open(file, "rb") as f:
+            await update.message.reply_audio(audio=f, title=title)
+
+        os.remove(file)
+
+    except Exception as e:
+        print(e)  # ini buat kamu lihat error di logs
+
+        # ===== FALLBACK =====
+        await update.message.reply_text("⚠️ MP3 gagal, kirim video...")
+
+        ydl_opts = {
+            'format': 'best',
+            'outtmpl': 'video.%(ext)s',
+            'quiet': True
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+
+        file = [f for f in os.listdir() if f.startswith("video")][0]
+
+        with open(file, "rb") as f:
+            await update.message.reply_video(video=f, caption=f"🎬 {title}")
+
+        os.remove(file)
+
+    except:
+        # ===== FALLBACK KE VIDEO =====
+        await update.message.reply_text("⚠️ MP3 tidak tersedia, mengirim video...")
+
+        ydl_opts = {
+            'format': 'best',
+            'outtmpl': 'video.%(ext)s',
+            'quiet': True
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+
+        file = [f for f in os.listdir() if f.startswith("video")][0]
+
+        with open(file, "rb") as f:
+            await update.message.reply_video(video=f, caption=f"🎬 {title}")
+
+        os.remove(file)
 
 # ===== RUN =====
 app = ApplicationBuilder().token(TOKEN).build()
