@@ -61,26 +61,34 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # ===== AUDIO =====
             if mode == "audio":
-                ydl_opts = {
-                    'format': 'best',
-                    'outtmpl': 'video.%(ext)s',
-                    'quiet': True
-                }
+    try:
+        # 1. Download video dulu
+        ydl_opts = {
+            'format': 'best',
+            'outtmpl': 'video.%(ext)s',
+            'quiet': True
+        }
 
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url])
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
 
-                video_file = next((f for f in os.listdir() if f.startswith("video")), None)
+        file = [f for f in os.listdir() if f.startswith("video")][0]
 
-                if not video_file:
-                    await msg.edit_text("❌ Video tidak ditemukan")
-                    return
+        # 2. Convert ke MP3 pakai ffmpeg
+        mp3_file = "audio.mp3"
+        os.system(f'ffmpeg -i "{file}" -vn -ab 192k -ar 44100 -y "{mp3_file}"')
 
-                # convert ke mp3 (butuh ffmpeg)
-                os.system(f'ffmpeg -i "{video_file}" -vn -ab 192k -ar 44100 -y audio.mp3')
+        # 3. Kirim ke user
+        with open(mp3_file, "rb") as f:
+            await update.message.reply_audio(audio=f, title=title)
 
-                if not os.path.exists("audio.mp3"):
-                    await msg.edit_text("❌ Gagal convert MP3")
+        # 4. Hapus file
+        os.remove(file)
+        os.remove(mp3_file)
+
+    except Exception as e:
+        print(e)
+        await update.message.reply_text("❌ Gagal convert MP3")
                     return
 
                 with open("audio.mp3", "rb") as f:
