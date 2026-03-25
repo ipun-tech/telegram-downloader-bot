@@ -1,6 +1,6 @@
 import os
 import yt_dlp
-import google.generativeai as genai
+from google import genai
 
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
@@ -9,35 +9,27 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 TOKEN = os.getenv("TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-print("API:", GEMINI_API_KEY)
+client = genai.Client(api_key=GEMINI_API_KEY)
 
-# setup Gemini
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
-# ================= UI =================
+# ===== UI =====
 keyboard = [
     ["🎬 Download Video", "🎧 Convert MP3"],
     ["🤖 Chat AI", "🔄 Reset"]
 ]
-
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-# ================= HELPER =================
 def clean_url(url):
     return url.split("?")[0]
 
-# ================= START =================
+# ===== START =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "✨ *Ipun Bot PRO*\n\n"
-        "📥 Kirim link langsung untuk download\n"
-        "🤖 Atau tanya apa saja\n\n"
-        "Menu hanya opsional 👇",
+        "✨ *Ipun Bot PRO*\n\n📥 Kirim link langsung untuk download\n🤖 Atau tanya apa saja\n\nMenu hanya opsional 👇",
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
 
-# ================= MAIN =================
+# ===== MAIN =====
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
@@ -62,31 +54,84 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("♻️ Reset berhasil")
         return
 
-    # ===== MODE =====
+    # ===== HANDLE =====
     mode = context.user_data.get("mode")
 
-    # ===== LINK =====
+    # ===== DOWNLOAD =====
     if text.startswith("http"):
-        if not mode:
-            await update.message.reply_text("⚠️ Pilih menu dulu")
-            return
-
-        await update.message.reply_text("⏳ Processing...")
-        return
-
-    # ===== CHAT AI =====
-    if mode == "ai":
-        await update.message.reply_text("🤖 Sedang berpikir...")
+        url = clean_url(text)
+        msg = await update.message.reply_text("⏳ Processing...")
 
         try:
-            response = model.generate_content(text)
-            await update.message.reply_text(response.text)
+            with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+                info = ydl.extract_info(url, download=False)
+                title = info.get("title", "Media")
+
+            # ===== MP3 =====
+            if mode == "audio":
+                ydl_opts = {
+                    'format': 'best',
+                    'outtmpl': 'video.%(ext)s',
+                    'quiet': True
+                }
+
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([url])
+
+                file = next((f for f in os.listdir() if f.startswith("video")), None)
+
+                os.system(f'ffmpeg -i "{file}" -vn -ab 192k -ar 44100 -y audio.mp3')
+
+                with open("audio.mp3", "rb") as f:
+                    await update.message.reply_audio(f, title=title)
+
+                os.remove(file)
+                os.remove("audio.mp3")
+
+            # ===== VIDEO =====
+            else:
+                ydl_opts = {
+                    'format': 'best',
+                    'outtmpl': 'video.%(ext)s',
+                    'quiet': True
+                }
+
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([url])
+
+                file = next((f for f in os.listdir() if f.startswith("video")), None)
+
+                with open(file, "rb") as f:
+                    await update.message.reply_video(f, caption=f"🎬 {title}")
+
+                os.remove(file)
+
+            await msg.edit_text("✅ Selesai!")
+
+        except Exception as e:
+            print("ERROR DOWNLOAD:", e)
+            await msg.edit_text("❌ Gagal download")
+
+    # ===== AI =====
+    elif mode == "ai":
+        try:
+            msg = await update.message.reply_text("🤖 Sedang berpikir...")
+
+            response = client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=text
+            )
+
+            await msg.edit_text(response.text)
 
         except Exception as e:
             print("AI ERROR:", e)
             await update.message.reply_text("❌ AI error")
 
-# ================= RUN =================
+    else:
+        await update.message.reply_text("⚠️ Pilih menu dulu")
+
+# ===== RUN =====
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
