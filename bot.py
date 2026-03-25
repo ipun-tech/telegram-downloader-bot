@@ -114,7 +114,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Memanggil API Gemini
             response = client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-1.5-flash",
                 contents=text
             )
 
