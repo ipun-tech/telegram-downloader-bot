@@ -115,7 +115,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Content-Type": "application/json"
             }
             payload = {
-                "model": "llama3-8b-8192", # Model pintar dari Meta
+                "model": "llama-3.3-70b-versatile", # INI MODEL TERBARU YANG AKTIF
                 "messages": [{"role": "user", "content": text}]
             }
             
