@@ -57,6 +57,65 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     mode = context.user_data.get("mode")
 
+    import os
+import yt_dlp
+import asyncio
+
+from google import genai
+
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+
+# ===== CONFIG =====
+TOKEN = os.getenv("TOKEN")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+client = genai.Client(api_key=GEMINI_API_KEY)
+# ===== UI =====
+keyboard = [
+    ["🎬 Download Video", "🎧 Convert MP3"],
+    ["🤖 Chat AI", "🔄 Reset"]
+]
+reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+def clean_url(url):
+    return url.split("?")[0]
+
+# ===== START =====
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "✨ *Ipun Bot PRO*\n\n📥 Kirim link untuk download\n🤖 Atau tanya apa saja\n\nMenu opsional 👇",
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+
+# ===== MAIN =====
+async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+
+    # ===== MENU =====
+    if "Video" in text:
+        context.user_data["mode"] = "video"
+        await update.message.reply_text("🔗 Kirim link video")
+        return
+
+    elif "MP3" in text:
+        context.user_data["mode"] = "audio"
+        await update.message.reply_text("🎧 Kirim link MP3")
+        return
+
+    elif "Chat AI" in text:
+        context.user_data["mode"] = "ai"
+        await update.message.reply_text("🤖 Silakan tanya apa saja")
+        return
+
+    elif "Reset" in text:
+        context.user_data.clear()
+        await update.message.reply_text("♻️ Reset berhasil")
+        return
+
+    mode = context.user_data.get("mode")
+
     # ===== DOWNLOAD =====
     if text.startswith("http"):
         url = clean_url(text)
@@ -119,6 +178,14 @@ elif mode == "ai":
 
     else:
         await update.message.reply_text("⚠️ Pilih menu dulu")
+
+# ===== RUN =====
+app = ApplicationBuilder().token(TOKEN).build()
+
+app.add_handler(CommandHandler("start", start))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
+
+app.run_polling(drop_pending_updates=True)
 
 # ===== RUN =====
 app = ApplicationBuilder().token(TOKEN).build()
