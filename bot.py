@@ -2,9 +2,11 @@ import os
 import yt_dlp
 import requests
 import asyncio
+from static_ffmpeg import add_paths # --- INI CHEAT CODE-NYA ---
+add_paths() # --- MEMAKSA BOT BAWA FFMPEG SENDIRI ---
+
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-
 # ===== CONFIG =====
 TOKEN = os.getenv("TOKEN")
 # Kita tidak pakai GEMINI_API_KEY lagi, kita pakai GROQ_API_KEY di bawah
