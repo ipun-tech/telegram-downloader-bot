@@ -1,0 +1,18 @@
+# Menggunakan sistem operasi Linux dasar yang sudah ada Python-nya
+FROM python:3.11-slim
+
+# Menentukan folder kerja di dalam server
+WORKDIR /app
+
+# INI BAGIAN PALING PENTING: Memaksa server menginstal FFmpeg
+RUN apt-get update && apt-get install -y ffmpeg
+
+# Mengkopi file requirements dan menginstalnya
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Mengkopi seluruh kode bot kamu (bot.py dll)
+COPY . .
+
+# Menjalankan botnya
+CMD ["python", "bot.py"]
