@@ -94,14 +94,17 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         return
 
-    # ===== AI CHAT =====
-    try:
-    response = model.generate_content(text)
-    await update.message.reply_text(response.text)
+    # ===== CHAT AI =====
+elif mode == "ai":
+    await update.message.reply_text("🤖 Sedang berpikir...")
 
-except Exception as e:
-    print("AI ERROR:", e)
-    await update.message.reply_text("❌ AI error")
+    try:
+        response = model.generate_content(text)
+        await update.message.reply_text(response.text)
+
+    except Exception as e:
+        print("AI ERROR:", e)
+        await update.message.reply_text("❌ AI error")
 
 # ================= RUN =================
 app = ApplicationBuilder().token(TOKEN).build()
