@@ -1,15 +1,13 @@
 import os
 import yt_dlp
-import asyncio
 import requests
+import asyncio
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
 # ===== CONFIG =====
 TOKEN = os.getenv("TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-
+# Kita tidak pakai GEMINI_API_KEY lagi, kita pakai GROQ_API_KEY di bawah
 
 # ===== UI =====
 keyboard = [
@@ -100,45 +98,60 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.edit_text(f"❌ Gagal memproses link.\nError: {str(e)[:50]}")
         return
 
-# --- 3. LOGIKA AI ---
+    # --- 3. LOGIKA AI (Menggunakan GROQ API - Llama 3) ---
     elif mode == "ai":
         try:
-            processing_msg = await update.message.reply_text("🤖 Mengetik...")
+            processing_msg = await update.message.reply_text("🤖 Mengetik dengan cepat...")
             
-            # Ganti ke gemini-2.5-flash di dalam URL
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-            headers = {'Content-Type': 'application/json'}
+            # Mengambil Key Groq dari Railway
+            GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+            if not GROQ_API_KEY:
+                await processing_msg.edit_text("❌ Variabel GROQ_API_KEY belum dipasang di Railway!")
+                return
+            
+            url_groq = "https://api.groq.com/openai/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            }
             payload = {
-                "contents": [{"parts": [{"text": text}]}]
+                "model": "llama3-8b-8192", # Model pintar dari Meta
+                "messages": [{"role": "user", "content": text}]
             }
             
-            # Kirim permintaan pakai requests
-            response = requests.post(url, headers=headers, json=payload)
+            # Tembak ke server Groq
+            response = requests.post(url_groq, headers=headers, json=payload)
             data = response.json()
 
             # Cek apakah ada balasan sukses
-            if 'candidates' in data:
-                jawaban_ai = data['candidates'][0]['content']['parts'][0]['text']
-                await processing_msg.edit_text(jawaban_ai)
-            
-            # Cek apakah ada error dari Google
-            elif 'error' in data:
-                pesan_error = data['error'].get('message', 'Error tidak diketahui')
-                if "429" in str(data) or "Quota" in pesan_error:
-                    await processing_msg.edit_text("❌ Limit API Google penuh. Coba lagi besok atau gunakan akun API lain.")
+            if 'choices' in data:
+                jawaban_ai = data['choices'][0]['message']['content']
+                
+                # Memecah teks jika terlalu panjang untuk Telegram
+                batas_karakter = 4000
+                if len(jawaban_ai) > batas_karakter:
+                    await processing_msg.edit_text(jawaban_ai[:batas_karakter])
+                    # Kirim sisanya sebagai pesan baru
+                    for i in range(batas_karakter, len(jawaban_ai), batas_karakter):
+                        await update.message.reply_text(jawaban_ai[i:i+batas_karakter])
                 else:
-                    await processing_msg.edit_text(f"⚠️ Error dari Google:\n{pesan_error}")
+                    await processing_msg.edit_text(jawaban_ai)
+            
+            elif 'error' in data:
+                pesan_error = data['error'].get('message', 'Error dari server Groq')
+                await processing_msg.edit_text(f"⚠️ Groq Error: {pesan_error}")
             else:
                 await processing_msg.edit_text("⚠️ AI gagal merespon.")
         
         except Exception as e:
             print("AI ERROR:", e)
             await processing_msg.edit_text("❌ Waduh, otak AI saya lagi error. Cek log server.")
-    
+            
     # --- 4. JIKA TIDAK ADA MODE ---
     else:
         await update.message.reply_text("💡 Pilih menu dulu atau kirim link video ya!")
 
+# ===== RUNNING BOT =====
 if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).read_timeout(30).write_timeout(30).build()
     app.add_handler(CommandHandler("start", start))
