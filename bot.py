@@ -99,18 +99,22 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ===== AI =====
     elif mode == "ai":
-        try:
-            msg = await update.message.reply_text("🤖 Sedang berpikir...")
+    try:
+        msg = await update.message.reply_text("🤖 Sedang berpikir...")
 
-            response = client.models.generate_content(
-    model="gemini-2.0-flash",
-    contents=text
-)
-            await msg.edit_text(response.text if response.text else "⚠️ Tidak ada respon")
+        import asyncio
+        await asyncio.sleep(2)
 
-        except Exception as e:
-            print("AI ERROR:", e)
-            await update.message.reply_text("❌ AI error")
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=text
+        )
+
+        await msg.edit_text(response.text if response.text else "⚠️ Tidak ada respon")
+
+    except Exception as e:
+        print("AI ERROR:", e)
+        await update.message.reply_text("❌ AI error")
 
     else:
         await update.message.reply_text("⚠️ Pilih menu dulu")
