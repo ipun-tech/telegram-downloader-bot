@@ -1,6 +1,6 @@
 import os
 import yt_dlp
-from google import genai
+import google.generativeai as genai
 
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
@@ -9,7 +9,8 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 TOKEN = os.getenv("TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-client = genai.Client(api_key=GEMINI_API_KEY)
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("gemini-pro")
 
 # ===== UI =====
 keyboard = [
@@ -24,7 +25,7 @@ def clean_url(url):
 # ===== START =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "✨ *Ipun Bot PRO*\n\n📥 Kirim link langsung untuk download\n🤖 Atau tanya apa saja\n\nMenu hanya opsional 👇",
+        "✨ *Ipun Bot PRO*\n\n📥 Kirim link untuk download\n🤖 Atau tanya apa saja\n\nMenu opsional 👇",
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
@@ -54,7 +55,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("♻️ Reset berhasil")
         return
 
-    # ===== HANDLE =====
     mode = context.user_data.get("mode")
 
     # ===== DOWNLOAD =====
@@ -67,45 +67,32 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 info = ydl.extract_info(url, download=False)
                 title = info.get("title", "Media")
 
+            ydl_opts = {
+                'format': 'best',
+                'outtmpl': 'video.%(ext)s',
+                'quiet': True
+            }
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+
+            file = next((f for f in os.listdir() if f.startswith("video")), None)
+
             # ===== MP3 =====
             if mode == "audio":
-                ydl_opts = {
-                    'format': 'best',
-                    'outtmpl': 'video.%(ext)s',
-                    'quiet': True
-                }
-
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url])
-
-                file = next((f for f in os.listdir() if f.startswith("video")), None)
-
                 os.system(f'ffmpeg -i "{file}" -vn -ab 192k -ar 44100 -y audio.mp3')
 
                 with open("audio.mp3", "rb") as f:
                     await update.message.reply_audio(f, title=title)
 
-                os.remove(file)
                 os.remove("audio.mp3")
 
             # ===== VIDEO =====
             else:
-                ydl_opts = {
-                    'format': 'best',
-                    'outtmpl': 'video.%(ext)s',
-                    'quiet': True
-                }
-
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url])
-
-                file = next((f for f in os.listdir() if f.startswith("video")), None)
-
                 with open(file, "rb") as f:
                     await update.message.reply_video(f, caption=f"🎬 {title}")
 
-                os.remove(file)
-
+            os.remove(file)
             await msg.edit_text("✅ Selesai!")
 
         except Exception as e:
@@ -117,10 +104,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             msg = await update.message.reply_text("🤖 Sedang berpikir...")
 
-            response = client.models.generate_content(
-    model="gemini-1.5-flash-001",
-    contents=text
-)
+            response = model.generate_content(text)
 
             await msg.edit_text(response.text if response.text else "⚠️ Tidak ada respon")
 
