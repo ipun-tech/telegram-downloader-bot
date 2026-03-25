@@ -105,8 +105,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             processing_msg = await update.message.reply_text("🤖 Mengetik...")
             
-            # Tembak langsung ke server API Gemini 1.5 Flash
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+            # Ganti ke gemini-2.5-flash di dalam URL
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
             headers = {'Content-Type': 'application/json'}
             payload = {
                 "contents": [{"parts": [{"text": text}]}]
