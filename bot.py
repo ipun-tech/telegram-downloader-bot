@@ -1,148 +1,112 @@
+import os
+import yt_dlp
+import google.generativeai as genai
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-import yt_dlp
-import os
-import google.generativeai as genai
 
-# ===== ENV =====
+# ================= CONFIG =================
 TOKEN = os.getenv("TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
-# ===== MENU =====
+# ================= UI =================
 keyboard = [
-    ["🎬 Download Video", "🎧 Convert to MP3"],
-    ["🔄 Reset"]
+    ["🎬 Download Video", "🎧 Convert MP3"],
+    ["🤖 Chat AI", "🔄 Reset"]
 ]
+
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
+# ================= HELPER =================
 def clean_url(url):
     return url.split("?")[0]
 
-# ===== START =====
+# ================= START =================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "✨ Ipun Bot (Downloader + AI Gemini)\n\n"
-        "🎬 Download Video\n🎧 Convert MP3\n🤖 Chat AI\n\n"
-        "Pilih menu atau langsung tanya",
+        "✨ *Ipun Bot PRO*\n\n"
+        "📥 Kirim link langsung untuk download\n"
+        "🤖 Atau tanya apa saja\n\n"
+        "Menu hanya opsional 👇",
+        parse_mode="Markdown",
         reply_markup=reply_markup
     )
 
-# ===== MAIN =====
+# ================= MAIN =================
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    # ===== MODE =====
-    if "Video" in text:
-        context.user_data["mode"] = "video"
-        await update.message.reply_text("🔗 Kirim link video")
-        return
-
-    elif "MP3" in text:
-        context.user_data["mode"] = "audio"
-        await update.message.reply_text("🎧 Kirim link untuk MP3")
-        return
-
-    elif "Reset" in text:
+    # ===== RESET =====
+    if "Reset" in text:
         context.user_data.clear()
-        await update.message.reply_text("♻️ Reset")
+        await update.message.reply_text("♻️ Reset berhasil")
         return
 
-    # ===== LINK PROCESS =====
-    elif text.startswith("http"):
-        mode = context.user_data.get("mode")
-
-        if not mode:
-            await update.message.reply_text("⚠️ Pilih menu dulu")
-            return
-
+    # ===== HANDLE LINK (AUTO DOWNLOAD) =====
+    if text.startswith("http"):
         url = clean_url(text)
         msg = await update.message.reply_text("⏳ Processing...")
 
         try:
-            # ambil judul
             with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
                 info = ydl.extract_info(url, download=False)
                 title = info.get("title", "Media")
 
-            # ===== AUDIO =====
-            if mode == "audio":
-                ydl_opts = {
-                    'format': 'best',
-                    'outtmpl': 'video.%(ext)s',
-                    'quiet': True
-                }
+            # default: download video
+            ydl_opts = {
+                'format': 'best',
+                'outtmpl': 'video.%(ext)s',
+                'quiet': True
+            }
 
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url])
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
 
-                video_file = next((f for f in os.listdir() if f.startswith("video")), None)
+            video_file = next((f for f in os.listdir() if f.startswith("video")), None)
 
-                if not video_file:
-                    await msg.edit_text("❌ Video tidak ditemukan")
-                    return
-
+            # ===== JIKA USER MAU MP3 =====
+            if "mp3" in text.lower() or "audio" in text.lower():
                 mp3_file = "audio.mp3"
                 os.system(f'ffmpeg -i "{video_file}" -vn -ab 192k -ar 44100 -y "{mp3_file}"')
 
-                if not os.path.exists(mp3_file):
-                    await msg.edit_text("❌ Gagal convert MP3")
-                    return
-
                 with open(mp3_file, "rb") as f:
-                    await update.message.reply_audio(f, title=title)
+                    await update.message.reply_audio(audio=f, title=title)
 
-                os.remove(video_file)
                 os.remove(mp3_file)
 
-            # ===== VIDEO =====
             else:
-                ydl_opts = {
-                    'format': 'best',
-                    'outtmpl': 'video.%(ext)s',
-                    'quiet': True
-                }
-
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url])
-
-                video_file = next((f for f in os.listdir() if f.startswith("video")), None)
-
-                if not video_file:
-                    await msg.edit_text("❌ Video tidak ditemukan")
-                    return
-
                 with open(video_file, "rb") as f:
                     await update.message.reply_video(f, caption=f"🎬 {title}")
 
-                os.remove(video_file)
+            os.remove(video_file)
 
             await msg.edit_text("✅ Selesai!")
 
         except Exception as e:
-            print("ERROR:", e)
+            print("DOWNLOAD ERROR:", e)
             await msg.edit_text("❌ Gagal download")
 
-    # ===== AI GEMINI =====
-    else:
-        try:
-            msg = await update.message.reply_text("🤖 Sedang berpikir...")
+        return
 
-            response = model.generate_content(text)
-            reply = response.text
+    # ===== AI CHAT =====
+    try:
+        msg = await update.message.reply_text("🤖 Sedang berpikir...")
 
-            await msg.edit_text(reply)
+        response = model.generate_content(text)
 
-        except Exception as e:
-            print("AI ERROR:", e)
-            await update.message.reply_text("❌ AI error")
+        await msg.edit_text(response.text)
 
-# ===== RUN =====
+    except Exception as e:
+        print("AI ERROR:", e)
+        await update.message.reply_text("❌ AI error")
+
+# ================= RUN =================
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
+print("BOT RUNNING...")
 app.run_polling()
