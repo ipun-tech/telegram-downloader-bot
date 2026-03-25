@@ -1,5 +1,7 @@
 import os
 import yt_dlp
+import asyncio
+
 from google import genai
 
 from telegram import Update, ReplyKeyboardMarkup
@@ -102,7 +104,6 @@ elif mode == "ai":
     try:
         msg = await update.message.reply_text("🤖 Sedang berpikir...")
 
-        import asyncio
         await asyncio.sleep(2)
 
         response = client.models.generate_content(
