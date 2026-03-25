@@ -62,30 +62,45 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = await update.message.reply_text("⏳ Sedang memproses media...")
 
         try:
-            ydl_opts = {
-                'format': 'best',
-                'outtmpl': 'downloaded_media.%(ext)s',
-                'quiet': True,
-                'no_warnings': True
-            }
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                title = info.get("title", "Media")
-                filename = ydl.prepare_filename(info)
-
             if mode == "audio":
-                audio_file = "audio_output.mp3"
-                await msg.edit_text("🎵 Mengonversi ke MP3...")
-                os.system(f'ffmpeg -i "{filename}" -vn -ab 192k -ar 44100 -y "{audio_file}"')
+                # Konfigurasi yt-dlp KHUSUS MP3 (Jauh lebih stabil)
+                ydl_opts = {
+                    'format': 'bestaudio/best',
+                    'outtmpl': 'audio_output.%(ext)s',
+                    'postprocessors': [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'mp3',
+                        'preferredquality': '192',
+                    }],
+                    'quiet': True,
+                    'no_warnings': True
+                }
                 
+                await msg.edit_text("🎵 Mengunduh dan mengonversi ke MP3...")
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                    title = info.get("title", "Audio")
+                
+                audio_file = "audio_output.mp3"
                 with open(audio_file, "rb") as f:
                     await update.message.reply_audio(f, title=title)
                 
                 if os.path.exists(audio_file): os.remove(audio_file)
-                if os.path.exists(filename): os.remove(filename)
 
             else:
+                # Konfigurasi yt-dlp KHUSUS VIDEO
+                ydl_opts = {
+                    'format': 'best',
+                    'outtmpl': 'video_output.%(ext)s',
+                    'quiet': True,
+                    'no_warnings': True
+                }
+                
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                    title = info.get("title", "Video")
+                    filename = ydl.prepare_filename(info)
+                
                 with open(filename, "rb") as f:
                     await update.message.reply_video(f, caption=f"🎬 {title}")
                 
