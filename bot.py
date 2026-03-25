@@ -1,13 +1,17 @@
 import os
 import yt_dlp
 import google.generativeai as genai
+
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
-# ================= CONFIG =================
+# ===== CONFIG =====
 TOKEN = os.getenv("TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+print("API:", GEMINI_API_KEY)
+
+# setup Gemini
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
