@@ -1,7 +1,7 @@
 import os
 import yt_dlp
 import asyncio
-import google.generativeai as genai # Menggunakan library AI yang lebih stabil
+from google import genai
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
@@ -9,9 +9,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 TOKEN = os.getenv("TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Inisialisasi Google Gemini (Cara Stabil)
-genai.configure(api_key=GEMINI_API_KEY)
-model_ai = genai.GenerativeModel('gemini-1.5-flash')
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ===== UI =====
 keyboard = [
@@ -107,8 +105,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             processing_msg = await update.message.reply_text("🤖 Mengetik...")
             
-            # Memanggil AI dengan library baru
-            response = model_ai.generate_content(text)
+            # Kembali menggunakan gemini-2.0-flash yang didukung SDK baru
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=text
+            )
 
             if response.text:
                 await processing_msg.edit_text(response.text)
@@ -116,8 +117,13 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await processing_msg.edit_text("⚠️ AI tidak memberikan respon.")
         
         except Exception as e:
-            print("AI ERROR:", e)
-            await processing_msg.edit_text("❌ Waduh, otak AI saya lagi error. Coba lagi nanti.")
+            error_msg = str(e)
+            print("AI ERROR:", error_msg)
+            # Menangkap error limit dari Google
+            if "429" in error_msg or "quota" in error_msg.lower():
+                await processing_msg.edit_text("❌ Limit API Google kamu sedang penuh/terlalu cepat. Tunggu 1 menit dan coba lagi.")
+            else:
+                await processing_msg.edit_text("❌ Waduh, otak AI saya lagi error. Coba lagi nanti.")
     
     # --- 4. JIKA TIDAK ADA MODE ---
     else:
