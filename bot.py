@@ -42,69 +42,50 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    # ===== RESET =====
-    if "Reset" in text:
+    # ===== MENU =====
+    if "Video" in text:
+        context.user_data["mode"] = "video"
+        await update.message.reply_text("🔗 Kirim link video")
+        return
+
+    elif "MP3" in text:
+        context.user_data["mode"] = "audio"
+        await update.message.reply_text("🎧 Kirim link MP3")
+        return
+
+    elif "Chat AI" in text:
+        context.user_data["mode"] = "ai"
+        await update.message.reply_text("🤖 Silakan tanya apa saja")
+        return
+
+    elif "Reset" in text:
         context.user_data.clear()
         await update.message.reply_text("♻️ Reset berhasil")
         return
 
-    # ===== HANDLE LINK (AUTO DOWNLOAD) =====
+    # ===== MODE =====
+    mode = context.user_data.get("mode")
+
+    # ===== LINK =====
     if text.startswith("http"):
-        url = clean_url(text)
-        msg = await update.message.reply_text("⏳ Processing...")
+        if not mode:
+            await update.message.reply_text("⚠️ Pilih menu dulu")
+            return
 
-        try:
-            with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
-                info = ydl.extract_info(url, download=False)
-                title = info.get("title", "Media")
-
-            # default: download video
-            ydl_opts = {
-                'format': 'best',
-                'outtmpl': 'video.%(ext)s',
-                'quiet': True
-            }
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([url])
-
-            video_file = next((f for f in os.listdir() if f.startswith("video")), None)
-
-            # ===== JIKA USER MAU MP3 =====
-            if "mp3" in text.lower() or "audio" in text.lower():
-                mp3_file = "audio.mp3"
-                os.system(f'ffmpeg -i "{video_file}" -vn -ab 192k -ar 44100 -y "{mp3_file}"')
-
-                with open(mp3_file, "rb") as f:
-                    await update.message.reply_audio(audio=f, title=title)
-
-                os.remove(mp3_file)
-
-            else:
-                with open(video_file, "rb") as f:
-                    await update.message.reply_video(f, caption=f"🎬 {title}")
-
-            os.remove(video_file)
-
-            await msg.edit_text("✅ Selesai!")
-
-        except Exception as e:
-            print("DOWNLOAD ERROR:", e)
-            await msg.edit_text("❌ Gagal download")
-
+        await update.message.reply_text("⏳ Processing...")
         return
 
     # ===== CHAT AI =====
-elif mode == "ai":
-    await update.message.reply_text("🤖 Sedang berpikir...")
+    if mode == "ai":
+        await update.message.reply_text("🤖 Sedang berpikir...")
 
-    try:
-        response = model.generate_content(text)
-        await update.message.reply_text(response.text)
+        try:
+            response = model.generate_content(text)
+            await update.message.reply_text(response.text)
 
-    except Exception as e:
-        print("AI ERROR:", e)
-        await update.message.reply_text("❌ AI error")
+        except Exception as e:
+            print("AI ERROR:", e)
+            await update.message.reply_text("❌ AI error")
 
 # ================= RUN =================
 app = ApplicationBuilder().token(TOKEN).build()
