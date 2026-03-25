@@ -118,11 +118,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg = await update.message.reply_text("🤖 Sedang berpikir...")
 
             response = client.models.generate_content(
-                model="gemini-1.5-flash-latest"
-                contents=text
+    model="gemini-1.5-flash-latest",
+    contents=text
             )
 
-            await msg.edit_text(response.text)
+            await msg.edit_text(response.text if response.text else "⚠️ Tidak ada respon")
 
         except Exception as e:
             print("AI ERROR:", e)
