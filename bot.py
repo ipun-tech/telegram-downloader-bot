@@ -2,70 +2,82 @@ import os
 import yt_dlp
 import requests
 import asyncio
-from static_ffmpeg import add_paths # --- INI CHEAT CODE-NYA ---
-add_paths() # --- MEMAKSA BOT BAWA FFMPEG SENDIRI ---
+from static_ffmpeg import add_paths
+add_paths() # Memaksa bot bawa FFmpeg sendiri
 
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+
 # ===== CONFIG =====
 TOKEN = os.getenv("TOKEN")
-# Kita tidak pakai GEMINI_API_KEY lagi, kita pakai GROQ_API_KEY di bawah
 
-# ===== UI =====
-keyboard = [
-    ["🎬 Download Video", "🎧 Convert MP3"],
-    ["🤖 Chat AI", "🔄 Reset"]
-]
-reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+# ===== UI: TOMBOL TRANSPARAN (INLINE) =====
+def get_main_menu():
+    keyboard = [
+        [InlineKeyboardButton("🎬 Download Video", callback_data="mode_video"),
+         InlineKeyboardButton("🎧 Convert MP3", callback_data="mode_audio")],
+        [InlineKeyboardButton("🤖 Chat AI", callback_data="mode_ai"),
+         InlineKeyboardButton("🔄 Reset", callback_data="mode_reset")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
 def clean_url(url):
     return url.split("?")[0]
 
 # ===== START COMMAND =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
+    pesan = (
         "✨ *Ipun Bot PRO*\n\n"
-        "📥 Kirim link untuk download\n"
-        "🤖 Atau tanya apa saja (Aktifkan Mode AI dulu)\n\n"
-        "Pilih menu di bawah 👇",
-        parse_mode="Markdown",
-        reply_markup=reply_markup
+        "Asisten pribadimu siap membantu!\n"
+        "Silakan pilih mode di bawah ini 👇"
     )
+    # Kirim pesan dengan tombol transparan
+    if update.message:
+        await update.message.reply_text(pesan, parse_mode="Markdown", reply_markup=get_main_menu())
 
-# ===== MAIN HANDLER =====
+# ===== HANDLER KLIK TOMBOL =====
+async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer() # Wajib agar tombol tidak loading terus
+    data = query.data
+
+    if data == "mode_video":
+        context.user_data["mode"] = "video"
+        await query.edit_message_text("🎬 **Mode Video Aktif.**\nKirim link video (IG/TikTok/YT).", parse_mode="Markdown", reply_markup=get_main_menu())
+    
+    elif data == "mode_audio":
+        context.user_data["mode"] = "audio"
+        await query.edit_message_text("🎧 **Mode MP3 Aktif.**\nKirim link untuk diconvert ke audio.", parse_mode="Markdown", reply_markup=get_main_menu())
+    
+    elif data == "mode_ai":
+        context.user_data["mode"] = "ai"
+        await query.edit_message_text("🤖 **Mode Chat AI Aktif.**\nSilakan kirim pertanyaanmu!", parse_mode="Markdown", reply_markup=get_main_menu())
+    
+    elif data == "mode_reset":
+        context.user_data.clear()
+        await query.edit_message_text("♻️ Sesi direset. Pilih mode baru:", reply_markup=get_main_menu())
+
+# ===== MAIN HANDLER (PROSES LINK / PESAN) =====
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     mode = context.user_data.get("mode")
 
-    # --- 1. LOGIKA MENU TOMBOL ---
-    if "Video" in text:
-        context.user_data["mode"] = "video"
-        await update.message.reply_text("🎬 **Mode Video Aktif.**\nKirim link video (IG/TikTok/YT).", parse_mode="Markdown")
+    # --- 1. JIKA BELUM PILIH MODE ---
+    if not mode:
+        await update.message.reply_text("💡 Pencet tombol /start dulu dan pilih mode ya!", reply_markup=get_main_menu())
         return
 
-    elif "MP3" in text:
-        context.user_data["mode"] = "audio"
-        await update.message.reply_text("🎧 **Mode MP3 Aktif.**\nKirim link untuk diconvert ke audio.", parse_mode="Markdown")
-        return
-
-    elif "Chat AI" in text:
-        context.user_data["mode"] = "ai"
-        await update.message.reply_text("🤖 **Mode Chat AI Aktif.**\nSilakan kirim pertanyaanmu!", parse_mode="Markdown")
-        return
-
-    elif "Reset" in text:
-        context.user_data.clear()
-        await update.message.reply_text("♻️ Sesi direset. Mode kembali ke default.")
-        return
-
-    # --- 2. LOGIKA DOWNLOAD ---
+    # --- 2. LOGIKA DOWNLOAD VIDEO & AUDIO ---
     if text.startswith("http"):
+        if mode not in ["video", "audio"]:
+            await update.message.reply_text("⚠️ Aktifkan Mode Video/MP3 dulu kalau mau download link.")
+            return
+
         url = clean_url(text)
-        msg = await update.message.reply_text("⏳ Sedang memproses media...")
+        msg = await update.message.reply_text("⏳ Memproses link media...")
 
         try:
             if mode == "audio":
-                # Konfigurasi yt-dlp KHUSUS MP3 (Jauh lebih stabil)
                 ydl_opts = {
                     'format': 'bestaudio/best',
                     'outtmpl': 'audio_output.%(ext)s',
@@ -77,8 +89,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     'quiet': True,
                     'no_warnings': True
                 }
-                
-                await msg.edit_text("🎵 Mengunduh dan mengonversi ke MP3...")
+                await msg.edit_text("🎵 Mengunduh dan convert ke MP3...")
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=True)
                     title = info.get("title", "Audio")
@@ -86,18 +97,16 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 audio_file = "audio_output.mp3"
                 with open(audio_file, "rb") as f:
                     await update.message.reply_audio(f, title=title)
-                
                 if os.path.exists(audio_file): os.remove(audio_file)
 
-            else:
-                # Konfigurasi yt-dlp KHUSUS VIDEO
+            elif mode == "video":
                 ydl_opts = {
                     'format': 'best',
                     'outtmpl': 'video_output.%(ext)s',
                     'quiet': True,
                     'no_warnings': True
                 }
-                
+                await msg.edit_text("🎬 Mengunduh video...")
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=True)
                     title = info.get("title", "Video")
@@ -105,73 +114,54 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 with open(filename, "rb") as f:
                     await update.message.reply_video(f, caption=f"🎬 {title}")
-                
                 if os.path.exists(filename): os.remove(filename)
 
             await msg.delete()
 
         except Exception as e:
             print("ERROR DOWNLOAD:", e)
-            await msg.edit_text(f"❌ Gagal memproses link.\nError: {str(e)[:50]}")
+            await msg.edit_text("❌ Gagal. Pastikan link-nya benar atau server sedang sibuk.")
         return
 
-    # --- 3. LOGIKA AI (Menggunakan GROQ API - Llama 3) ---
-    elif mode == "ai":
+    # --- 3. LOGIKA AI GROQ ---
+    if mode == "ai":
+        if text.startswith("http"): return # Biar ga bentrok sama link
+        
         try:
-            processing_msg = await update.message.reply_text("🤖 Mengetik dengan cepat...")
+            processing_msg = await update.message.reply_text("🤖 AI sedang berpikir...")
             
-            # Mengambil Key Groq dari Railway
             GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-            if not GROQ_API_KEY:
-                await processing_msg.edit_text("❌ Variabel GROQ_API_KEY belum dipasang di Railway!")
-                return
-            
             url_groq = "https://api.groq.com/openai/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json"
-            }
+            headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
             payload = {
-                "model": "llama-3.3-70b-versatile", # INI MODEL TERBARU YANG AKTIF
+                "model": "llama-3.3-70b-versatile", 
                 "messages": [{"role": "user", "content": text}]
             }
             
-            # Tembak ke server Groq
             response = requests.post(url_groq, headers=headers, json=payload)
             data = response.json()
 
-            # Cek apakah ada balasan sukses
             if 'choices' in data:
                 jawaban_ai = data['choices'][0]['message']['content']
-                
-                # Memecah teks jika terlalu panjang untuk Telegram
                 batas_karakter = 4000
                 if len(jawaban_ai) > batas_karakter:
                     await processing_msg.edit_text(jawaban_ai[:batas_karakter])
-                    # Kirim sisanya sebagai pesan baru
                     for i in range(batas_karakter, len(jawaban_ai), batas_karakter):
                         await update.message.reply_text(jawaban_ai[i:i+batas_karakter])
                 else:
                     await processing_msg.edit_text(jawaban_ai)
-            
-            elif 'error' in data:
-                pesan_error = data['error'].get('message', 'Error dari server Groq')
-                await processing_msg.edit_text(f"⚠️ Groq Error: {pesan_error}")
             else:
-                await processing_msg.edit_text("⚠️ AI gagal merespon.")
+                await processing_msg.edit_text("⚠️ Groq Error. Cek log.")
         
         except Exception as e:
-            print("AI ERROR:", e)
-            await processing_msg.edit_text("❌ Waduh, otak AI saya lagi error. Cek log server.")
-            
-    # --- 4. JIKA TIDAK ADA MODE ---
-    else:
-        await update.message.reply_text("💡 Pilih menu dulu atau kirim link video ya!")
+            await processing_msg.edit_text("❌ Waduh, otak AI error.")
 
 # ===== RUNNING BOT =====
 if __name__ == '__main__':
-    app = ApplicationBuilder().token(TOKEN).read_timeout(30).write_timeout(30).build()
+    app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button_click)) # Handler baru untuk tombol
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
-    print("Bot Berhasil Dijalankan...")
+    
+    print("Bot Ipun PRO (UI Baru) Berjalan...")
     app.run_polling(drop_pending_updates=True)
