@@ -1,7 +1,7 @@
 import os
 import yt_dlp
 import asyncio
-from google import genai
+import requests
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
@@ -9,7 +9,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 TOKEN = os.getenv("TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-client = genai.Client(api_key=GEMINI_API_KEY)
+
 
 # ===== UI =====
 keyboard = [
@@ -100,30 +100,40 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.edit_text(f"❌ Gagal memproses link.\nError: {str(e)[:50]}")
         return
 
-    # --- 3. LOGIKA AI ---
+# --- 3. LOGIKA AI ---
     elif mode == "ai":
         try:
             processing_msg = await update.message.reply_text("🤖 Mengetik...")
             
-            # Kembali menggunakan gemini-2.0-flash yang didukung SDK baru
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=text
-            )
+            # Tembak langsung ke server API Gemini 1.5 Flash
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+            headers = {'Content-Type': 'application/json'}
+            payload = {
+                "contents": [{"parts": [{"text": text}]}]
+            }
+            
+            # Kirim permintaan pakai requests
+            response = requests.post(url, headers=headers, json=payload)
+            data = response.json()
 
-            if response.text:
-                await processing_msg.edit_text(response.text)
+            # Cek apakah ada balasan sukses
+            if 'candidates' in data:
+                jawaban_ai = data['candidates'][0]['content']['parts'][0]['text']
+                await processing_msg.edit_text(jawaban_ai)
+            
+            # Cek apakah ada error dari Google
+            elif 'error' in data:
+                pesan_error = data['error'].get('message', 'Error tidak diketahui')
+                if "429" in str(data) or "Quota" in pesan_error:
+                    await processing_msg.edit_text("❌ Limit API Google penuh. Coba lagi besok atau gunakan akun API lain.")
+                else:
+                    await processing_msg.edit_text(f"⚠️ Error dari Google:\n{pesan_error}")
             else:
-                await processing_msg.edit_text("⚠️ AI tidak memberikan respon.")
+                await processing_msg.edit_text("⚠️ AI gagal merespon.")
         
         except Exception as e:
-            error_msg = str(e)
-            print("AI ERROR:", error_msg)
-            # Menangkap error limit dari Google
-            if "429" in error_msg or "quota" in error_msg.lower():
-                await processing_msg.edit_text("❌ Limit API Google kamu sedang penuh/terlalu cepat. Tunggu 1 menit dan coba lagi.")
-            else:
-                await processing_msg.edit_text("❌ Waduh, otak AI saya lagi error. Coba lagi nanti.")
+            print("AI ERROR:", e)
+            await processing_msg.edit_text("❌ Waduh, otak AI saya lagi error. Cek log server.")
     
     # --- 4. JIKA TIDAK ADA MODE ---
     else:
