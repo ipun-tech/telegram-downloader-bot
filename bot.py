@@ -118,7 +118,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg = await update.message.reply_text("🤖 Sedang berpikir...")
 
             response = client.models.generate_content(
-                model="gemini-1.5-flash",
+                model="gemini-1.5-flash-latest"
                 contents=text
             )
 
@@ -132,9 +132,17 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Pilih menu dulu")
 
 # ===== RUN =====
-app = ApplicationBuilder().token(TOKEN).build()
+async def main():
+    app = ApplicationBuilder().token(TOKEN).build()
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
+    # 🔥 WAJIB: hapus webhook lama
+    await app.bot.delete_webhook(drop_pending_updates=True)
 
-app.run_polling(drop_pending_updates=True)
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
+
+    await app.run_polling()
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
