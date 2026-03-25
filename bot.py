@@ -13,7 +13,7 @@ print("API:", GEMINI_API_KEY)
 
 # setup Gemini
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-pro")
 
 # ================= UI =================
 keyboard = [
@@ -96,15 +96,12 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ===== AI CHAT =====
     try:
-        msg = await update.message.reply_text("🤖 Sedang berpikir...")
+    response = model.generate_content(text)
+    await update.message.reply_text(response.text)
 
-        response = model.generate_content(text)
-
-        await msg.edit_text(response.text)
-
-    except Exception as e:
-        print("AI ERROR:", e)
-        await update.message.reply_text("❌ AI error")
+except Exception as e:
+    print("AI ERROR:", e)
+    await update.message.reply_text("❌ AI error")
 
 # ================= RUN =================
 app = ApplicationBuilder().token(TOKEN).build()
@@ -112,5 +109,5 @@ app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
-print("BOT RUNNING...")
+await application.bot.delete_webhook(drop_pending_updates=True)
 app.run_polling()
