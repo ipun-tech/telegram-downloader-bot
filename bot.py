@@ -98,7 +98,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.edit_text("❌ Gagal download")
 
     # ===== AI =====
-    elif mode == "ai":
+elif mode == "ai":
     try:
         msg = await update.message.reply_text("🤖 Sedang berpikir...")
 
