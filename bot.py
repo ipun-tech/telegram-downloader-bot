@@ -1,6 +1,6 @@
 import os
 import yt_dlp
-import google.generativeai as genai
+from google import genai
 
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
@@ -9,9 +9,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 TOKEN = os.getenv("TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-pro")
-
+client = genai.Client(api_key=GEMINI_API_KEY)
 # ===== UI =====
 keyboard = [
     ["🎬 Download Video", "🎧 Convert MP3"],
@@ -104,8 +102,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             msg = await update.message.reply_text("🤖 Sedang berpikir...")
 
-            response = model.generate_content(text)
-
+            response = client.models.generate_content(
+    model="gemini-2.0-flash",
+    contents=text
+)
             await msg.edit_text(response.text if response.text else "⚠️ Tidak ada respon")
 
         except Exception as e:
