@@ -2,6 +2,7 @@ import os
 import yt_dlp
 import requests
 import asyncio
+import io # <-- Tambahan baru untuk ngurus file gambar
 from static_ffmpeg import add_paths
 add_paths() # Memaksa bot bawa FFmpeg sendiri
 
@@ -10,14 +11,19 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Cal
 
 # ===== CONFIG =====
 TOKEN = os.getenv("TOKEN")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
+# Mengambil kunci Hugging Face dari Railway
+HF_TOKEN = os.getenv("HF_TOKEN") 
+HF_API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1"
 # ===== UI: TOMBOL TRANSPARAN (INLINE) =====
 def get_main_menu():
     keyboard = [
         [InlineKeyboardButton("🎬 Download Video", callback_data="mode_video"),
          InlineKeyboardButton("🎧 Convert MP3", callback_data="mode_audio")],
         [InlineKeyboardButton("🤖 Chat AI", callback_data="mode_ai"),
-         InlineKeyboardButton("🔄 Reset", callback_data="mode_reset")]
+         InlineKeyboardButton("🎨 Buat Gambar", callback_data="mode_gambar")], # <-- Tombol baru
+        [InlineKeyboardButton("🔄 Reset", callback_data="mode_reset")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -31,14 +37,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Asisten pribadimu siap membantu!\n"
         "Silakan pilih mode di bawah ini 👇"
     )
-    # Kirim pesan dengan tombol transparan
     if update.message:
         await update.message.reply_text(pesan, parse_mode="Markdown", reply_markup=get_main_menu())
 
 # ===== HANDLER KLIK TOMBOL =====
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer() # Wajib agar tombol tidak loading terus
+    await query.answer() 
     data = query.data
 
     if data == "mode_video":
@@ -52,6 +57,10 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "mode_ai":
         context.user_data["mode"] = "ai"
         await query.edit_message_text("🤖 **Mode Chat AI Aktif.**\nSilakan kirim pertanyaanmu!", parse_mode="Markdown", reply_markup=get_main_menu())
+        
+    elif data == "mode_gambar": # <-- Mode baru
+        context.user_data["mode"] = "gambar"
+        await query.edit_message_text("🎨 **Mode Gambar Aktif.**\nKirim deskripsi gambar (pakai bahasa Inggris ya).\nContoh: *a cinematic shot of a futuristic city*", parse_mode="Markdown", reply_markup=get_main_menu())
     
     elif data == "mode_reset":
         context.user_data.clear()
@@ -125,12 +134,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # --- 3. LOGIKA AI GROQ ---
     if mode == "ai":
-        if text.startswith("http"): return # Biar ga bentrok sama link
+        if text.startswith("http"): return 
         
         try:
             processing_msg = await update.message.reply_text("🤖 AI sedang berpikir...")
             
-            GROQ_API_KEY = os.getenv("GROQ_API_KEY")
             url_groq = "https://api.groq.com/openai/v1/chat/completions"
             headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
             payload = {
@@ -156,12 +164,44 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await processing_msg.edit_text("❌ Waduh, otak AI error.")
 
+    # --- 4. LOGIKA PEMBUAT GAMBAR (BARU) ---
+    if mode == "gambar":
+        if text.startswith("http"): return 
+        
+        processing_msg = await update.message.reply_text("🎨 Ipun Bot sedang melukis... ⏳ (Butuh 10-30 detik)")
+        
+        try:
+            headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+            payload = {"inputs": text}
+            
+            # Minta gambar ke Hugging Face
+            response = requests.post(HF_API_URL, headers=headers, json=payload)
+            
+            if response.status_code == 200:
+                image_bytes = response.content
+                image = io.BytesIO(image_bytes)
+                image.name = 'hasil_gambar.jpg'
+                
+                # Kirim foto ke Telegram
+                await update.message.reply_photo(
+                    photo=image, 
+                    caption=f"✨ Berhasil! Ini gambarmu untuk:\n_{text}_", 
+                    parse_mode="Markdown"
+                )
+                await processing_msg.delete()
+            else:
+                await processing_msg.edit_text("❌ Waduh, pelukisnya lagi sibuk (Server Hugging Face penuh). Coba lagi beberapa menit ya!")
+                
+        except Exception as e:
+            print("ERROR GAMBAR:", e)
+            await processing_msg.edit_text("❌ Gagal membuat gambar. Cek terminal laptopmu.")
+
 # ===== RUNNING BOT =====
 if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(button_click)) # Handler baru untuk tombol
+    app.add_handler(CallbackQueryHandler(button_click)) 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
     
-    print("Bot Ipun PRO (UI Baru) Berjalan...")
+    print("Bot Ipun PRO (UI Baru + Gambar) Berjalan...")
     app.run_polling(drop_pending_updates=True)
