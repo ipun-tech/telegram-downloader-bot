@@ -164,46 +164,56 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await processing_msg.edit_text("❌ Waduh, otak AI error.")
 
-    # --- 4. LOGIKA PEMBUAT GAMBAR (JALUR VIP POLLINATIONS) ---
+    # --- 4. LOGIKA PEMBUAT GAMBAR (HUGGING FACE ANTI-NYERAH) ---
     if mode == "gambar":
         if text.startswith("http"): return 
         
-        processing_msg = await update.message.reply_text("🎨 Memanggil pelukis jalur VIP... ⏳ (Menyamar jadi browser)")
+        processing_msg = await update.message.reply_text("🎨 Mengirim perintah ke pelukis Hugging Face... ⏳")
         
         try:
-            # Mengubah spasi dan koma jadi format URL yang aman
-            import urllib.parse
-            prompt_aman = urllib.parse.quote(text)
+            HF_TOKEN = os.getenv("HF_TOKEN") 
+            # Pakai model OpenJourney yang jago bikin gambar sinematik & estetik
+            API_URL = "https://api-inference.huggingface.co/models/prompthero/openjourney"
+            headers = {"Authorization": f"Bearer {HF_TOKEN}"}
             
-            url_gambar = f"https://image.pollinations.ai/prompt/{prompt_aman}?width=1024&height=1024&nologo=true"
+            # Tambahan "mdjrny-v4 style" biar hasilnya auto-sinematik
+            payload = {"inputs": f"mdjrny-v4 style, {text}"}
             
-            # KUNCI RAHASIA: Nyamar jadi Safari di iPhone 12 biar nggak diblokir satpam server!
-            headers = {
-                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1"
-            }
-            
-            # Kita kirim permintaan bareng identitas penyamarannya
-            response = requests.get(url_gambar, headers=headers)
-            
-            if response.status_code == 200:
-                image_bytes = response.content
-                image = io.BytesIO(image_bytes)
-                image.name = 'hasil_gambar.jpg'
+            maks_percobaan = 5
+            for i in range(maks_percobaan):
+                response = requests.post(API_URL, headers=headers, json=payload)
                 
-                # Kirim foto ke Telegram
-                await update.message.reply_photo(
-                    photo=image, 
-                    caption=f"✨ Tembus jalur VIP! Ini gambarmu untuk:\n_{text}_", 
-                    parse_mode="Markdown"
-                )
-                await processing_msg.delete()
+                if response.status_code == 200:
+                    image_bytes = response.content
+                    image = io.BytesIO(image_bytes)
+                    image.name = 'hasil_gambar.jpg'
+                    
+                    await update.message.reply_photo(
+                        photo=image, 
+                        caption=f"✨ Berhasil! Ini gambarmu untuk:\n_{text}_", 
+                        parse_mode="Markdown"
+                    )
+                    await processing_msg.delete()
+                    break # Keluar dari loop karena sukses
+                    
+                elif response.status_code == 503:
+                    # Server lagi tidur (Cold Start), kita paksa bot nunggu
+                    try:
+                        estimasi_waktu = response.json().get('estimated_time', 20)
+                    except:
+                        estimasi_waktu = 20
+                        
+                    await processing_msg.edit_text(f"⏳ Server lagi bangun tidur nih... Tunggu sekitar {int(estimasi_waktu)} detik ya. (Mencoba ulang {i+1}/{maks_percobaan})")
+                    await asyncio.sleep(estimasi_waktu) # Bot sabar menunggu
+                else:
+                    await processing_msg.edit_text(f"❌ Server ngasih Error: {response.status_code}")
+                    break
             else:
-                # Kalau gagal, biar botnya ngasih tau error nomor berapa
-                await processing_msg.edit_text(f"❌ Wah ketahuan satpam. Server ngasih Error: {response.status_code}")
+                await processing_msg.edit_text("❌ Udah ditungguin tapi pelukisnya tetep tidur pulas. Coba lagi nanti ya.")
                 
         except Exception as e:
             print("ERROR GAMBAR:", e)
-            await processing_msg.edit_text("❌ Gagal membuat gambar. Cek terminal laptopmu.")
+            await processing_msg.edit_text("❌ Gagal membuat gambar. Cek terminal/Railway.")
 
 # ===== RUNNING BOT =====
 if __name__ == '__main__':
