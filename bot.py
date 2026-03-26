@@ -189,7 +189,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Kirim hasilnya ke Telegram!
                 await update.message.reply_photo(
                     photo=image, 
-                    caption=f"✨ Berhasil dari Pabrik Sendiri! Ini gambarmu untuk:\n_{text}_", 
+                    caption=f"✨ **Ipun Bot PRO | Image Generation**\n\nVisual berhasil diproses berdasarkan instruksi:\n_{text}_", 
                     parse_mode="Markdown"
                 )
                 await processing_msg.delete()
