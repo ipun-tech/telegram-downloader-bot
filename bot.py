@@ -164,18 +164,20 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await processing_msg.edit_text("❌ Waduh, otak AI error.")
 
-    # --- 4. LOGIKA PEMBUAT GAMBAR (BARU) ---
+    # --- 4. LOGIKA PEMBUAT GAMBAR (JALUR VIP POLLINATIONS) ---
     if mode == "gambar":
         if text.startswith("http"): return 
         
-        processing_msg = await update.message.reply_text("🎨 Ipun Bot sedang melukis... ⏳ (Butuh 10-30 detik)")
+        processing_msg = await update.message.reply_text("🎨 Memanggil pelukis jalur VIP... ⏳ (Tunggu sebentar)")
         
         try:
-            headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-            payload = {"inputs": text}
+            # Mengamankan teks prompt untuk URL
+            prompt_aman = text.replace(" ", "%20")
+            # Kita pakai resolusi HD (1024x1024) dan hilangkan logo watermark-nya
+            url_gambar = f"https://image.pollinations.ai/prompt/{prompt_aman}?width=1024&height=1024&nologo=true"
             
-            # Minta gambar ke Hugging Face
-            response = requests.post(HF_API_URL, headers=headers, json=payload)
+            # Ambil gambar dari server VIP
+            response = requests.get(url_gambar)
             
             if response.status_code == 200:
                 image_bytes = response.content
@@ -185,12 +187,12 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Kirim foto ke Telegram
                 await update.message.reply_photo(
                     photo=image, 
-                    caption=f"✨ Berhasil! Ini gambarmu untuk:\n_{text}_", 
+                    caption=f"✨ Berhasil pakai jalur VIP! Ini gambarmu untuk:\n_{text}_", 
                     parse_mode="Markdown"
                 )
                 await processing_msg.delete()
             else:
-                await processing_msg.edit_text("❌ Waduh, pelukisnya lagi sibuk (Server Hugging Face penuh). Coba lagi beberapa menit ya!")
+                await processing_msg.edit_text("❌ Pelukis VIP juga lagi sibuk nih. Coba lagi bentar ya.")
                 
         except Exception as e:
             print("ERROR GAMBAR:", e)
