@@ -6,9 +6,14 @@ add_paths()
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
+# ===== CONFIG =====
 TOKEN = os.getenv("TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
+# MEMORY: Simpan history obrolan (max 10 pesan) per user
+user_chat_history = {}
+
+# ===== UI: MENU UTAMA =====
 def get_main_menu():
     keyboard = [
         [InlineKeyboardButton("🎬 Download Video", callback_data="mode_video"),
@@ -20,31 +25,45 @@ def get_main_menu():
     ]
     return InlineKeyboardMarkup(keyboard)
 
+def clean_url(url):
+    return url.split("?")[0]
+
+# ===== START COMMAND =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    pesan = "✨ **Ipun Bot PRO v5.2**\n\nAsisten digitalmu sudah siap. Silakan pilih mode di bawah ini: 👇"
+    user_id = update.effective_user.id
+    user_chat_history[user_id] = [] # Reset history saat start/reset
+    
+    pesan = "✨ **Ipun Bot PRO v5.3 (Memory Edition)**\n\nAsisten digitalmu sudah siap. Silakan pilih mode di bawah ini: 👇"
     if update.message:
         await update.message.reply_text(pesan, parse_mode="Markdown", reply_markup=get_main_menu())
 
+# ===== HANDLER KLIK TOMBOL =====
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer() 
     data = query.data
+    user_id = query.from_user.id
     
     modes = {
         "mode_video": ("video", "🎬 **Mode Video Aktif.**\nKirim link video (IG/TikTok/YT)."),
-        "mode_audio": ("audio", "🎧 **Mode MP3 Aktif.**\nKirim link media untuk diconvert."),
-        "mode_ai": ("ai", "🤖 **Mode Chat AI Aktif.**\nSilakan kirim pertanyaanmu!"),
+        "mode_audio": ("audio", "🎧 **Mode MP3 Aktif.**\nKirim link media."),
+        "mode_ai": ("ai", "🤖 **Mode Chat AI Aktif.**\nSilakan bertanya!"),
         "mode_gambar": ("gambar", "🎨 **Mode Gambar Aktif.**\nKirim deskripsi visual (English)."),
-        "mode_warna": ("warna", "🌈 **Mode Palet Warna Aktif.**\nKirim Foto/Video!"), # Sudah dihapus kata iPhone-mu
+        "mode_warna": ("warna", "🌈 **Mode Palet Warna Aktif.**\nKirim Foto/Video!"),
         "mode_reset": (None, "♻️ **Sesi direset.** Pilih mode baru:")
     }
     
     mode, msg = modes.get(data, (None, ""))
-    if mode: context.user_data["mode"] = mode
-    else: context.user_data.clear()
+    if mode: 
+        context.user_data["mode"] = mode
+        if mode == "ai": user_chat_history[user_id] = [] # Reset history saat masuk mode AI
+    else: 
+        context.user_data.clear()
+        user_chat_history[user_id] = [] # Reset history saat reset
     
     await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=get_main_menu())
 
+# --- 1. LOGIKA MEDIA (WARNA) ---
 async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("mode") != "warna":
         await update.message.reply_text("💡 Aktifkan **Mode Palet Warna** dulu ya!", reply_markup=get_main_menu())
@@ -68,12 +87,17 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if os.path.exists(f): os.remove(f)
     except: await msg.edit_text("❌ Gagal mengekstrak warna.")
 
+# --- 2. LOGIKA TEKS (CHAT, GAMBAR, DOWNLOAD) ---
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     mode = context.user_data.get("mode")
+    user_id = update.effective_user.id
+    
     if not mode: return await update.message.reply_text("💡 Pilih mode dulu di /start!", reply_markup=get_main_menu())
 
+    # A. LOGIKA DOWNLOAD
     if text.startswith("http"):
+        if mode not in ["video", "audio"]: return await update.message.reply_text("⚠️ Aktifkan Mode Video/MP3 dulu.")
         msg = await update.message.reply_text("⏳ Memproses link...")
         try:
             if mode == "audio":
@@ -88,30 +112,52 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 os.remove("out.mp4")
             await msg.delete()
         except: await msg.edit_text("❌ Gagal download.")
+        return
     
+    # B. LOGIKA BUAT GAMBAR
     elif mode == "gambar":
         msg = await update.message.reply_text("🎨 Pabrik sedang melukis... ⏳")
         try:
             r = requests.get(f"https://ipun-pelukis.tipungsinoman.workers.dev/?prompt={text}")
-            # Caption sudah dihapus tanda bintangnya (**)
-            await update.message.reply_photo(io.BytesIO(r.content), caption=f"✨Ipun Bot PRO | Image Generation\n\nPrompt: {text}")
+            await update.message.reply_photo(io.BytesIO(r.content), caption=f"Ipun Bot PRO | Image Generation\nPrompt: {text}")
             await msg.delete()
         except: await msg.edit_text("❌ Pabrik gambar macet.")
 
+    # C. LOGIKA CHAT AI (GROQ DENGAN MEMORY) 🧠
     elif mode == "ai":
         msg = await update.message.reply_text("🤖 Berpikir...")
         try:
+            # 1. Ambil History Obrolan User
+            history = user_chat_history.get(user_id, [])
+            
+            # 2. Tambahkan Pesan Baru ke History
+            history.append({"role": "user", "content": text})
+            
+            # 3. Batasi History (Max 10 pesan terakhir) biar server nggak berat
+            if len(history) > 10: history = history[-10:]
+            
+            # 4. Kirim History Lengkap ke Groq AI
             h = {"Authorization": f"Bearer {GROQ_API_KEY}"}
-            p = {"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": text}]}
+            p = {"model": "llama-3.3-70b-versatile", "messages": history}
             r = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, json=p).json()
-            await msg.edit_text(r['choices'][0]['message']['content'][:4000])
+            
+            # 5. Ambil Jawaban AI
+            jawaban = r['choices'][0]['message']['content']
+            
+            # 6. Tambahkan Jawaban AI ke History
+            history.append({"role": "assistant", "content": jawaban})
+            user_chat_history[user_id] = history
+            
+            # 7. Kirim Jawaban ke Telegram
+            await msg.edit_text(jawaban[:4000])
         except: await msg.edit_text("❌ Otak AI sedang error.")
 
+# ===== RUNNING BOT =====
 if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_click))
     app.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO, handle_media))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
-    print("🚀 Ipun Bot PRO v5.2 Online!")
+    print("🚀 Ipun Bot PRO v5.3 (Memory Edition) Online!")
     app.run_polling(drop_pending_updates=True)
