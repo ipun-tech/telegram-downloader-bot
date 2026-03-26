@@ -119,7 +119,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = await update.message.reply_text("🎨 Pabrik sedang melukis... ⏳")
         try:
             r = requests.get(f"https://ipun-pelukis.tipungsinoman.workers.dev/?prompt={text}")
-            await update.message.reply_photo(io.BytesIO(r.content), caption=f"Ipun Bot PRO | Image Generation\nPrompt: {text}")
+            await update.message.reply_photo(io.BytesIO(r.content), caption=f"✨Super Bot PRO | Image Generation\nPrompt: {text}")
             await msg.delete()
         except: await msg.edit_text("❌ Pabrik gambar macet.")
 
