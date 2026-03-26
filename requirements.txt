@@ -2,6 +2,6 @@ python-telegram-bot==20.7
 yt-dlp>=2023.0.0
 requests
 static-ffmpeg
-opencv-python
+opencv-python-headless
 numpy
 colorthief
