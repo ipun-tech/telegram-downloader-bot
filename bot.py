@@ -33,7 +33,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_chat_history[user_id] = [] # Reset history saat start/reset
     
-    pesan = "✨ **Ipun Bot PRO v5.3 (Memory Edition)**\n\nAsisten digitalmu sudah siap. Silakan pilih mode di bawah ini: 👇"
+    pesan = "✨ **Ipun Bot PRO v5.3**\n\nAsisten digitalmu sudah siap. Silakan pilih mode di bawah ini: 👇"
     if update.message:
         await update.message.reply_text(pesan, parse_mode="Markdown", reply_markup=get_main_menu())
 
