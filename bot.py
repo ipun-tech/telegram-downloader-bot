@@ -94,7 +94,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             r = requests.get(f"https://ipun-pelukis.tipungsinoman.workers.dev/?prompt={text}")
             # Caption sudah dihapus tanda bintangnya (**)
-            await update.message.reply_photo(io.BytesIO(r.content), caption=f"Ipun Bot PRO | Image Generation\n\nPrompt: {text}")
+            await update.message.reply_photo(io.BytesIO(r.content), caption=f"✨Ipun Bot PRO | Image Generation\n\nPrompt: {text}")
             await msg.delete()
         except: await msg.edit_text("❌ Pabrik gambar macet.")
 
