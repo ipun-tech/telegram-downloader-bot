@@ -164,57 +164,43 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await processing_msg.edit_text("❌ Waduh, otak AI error.")
 
-    # --- 4. LOGIKA PEMBUAT GAMBAR (HUGGING FACE ANTI-NYERAH) ---
+    # --- 4. LOGIKA PEMBUAT GAMBAR (PABRIK SENDIRI - CLOUDFLARE) ---
     if mode == "gambar":
         if text.startswith("http"): return 
         
-        processing_msg = await update.message.reply_text("🎨 Mengirim perintah ke pelukis Hugging Face... ⏳")
+        processing_msg = await update.message.reply_text("🎨 Pabrik Ipun sedang melukis... ⏳ (Cuma butuh beberapa detik!)")
         
         try:
-            HF_TOKEN = os.getenv("HF_TOKEN") 
-            # Pakai model OpenJourney yang jago bikin gambar sinematik & estetik
-            API_URL = "https://api-inference.huggingface.co/models/prompthero/openjourney"
-            headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+            import urllib.parse
+            # Mengamankan teks prompt biar aman masuk ke URL
+            prompt_aman = urllib.parse.quote(text)
             
-            # Tambahan "mdjrny-v4 style" biar hasilnya auto-sinematik
-            payload = {"inputs": f"mdjrny-v4 style, {text}"}
+            # INI DIA LINK PABRIK PRIBADIMU! 🔥
+            url_pabrik = f"https://ipun-pelukis.tipungsinoman.workers.dev/?prompt={prompt_aman}"
             
-            maks_percobaan = 5
-            for i in range(maks_percobaan):
-                response = requests.post(API_URL, headers=headers, json=payload)
+            # Panggil pabriknya (Nggak perlu kunci/API key lagi karena ini milikmu!)
+            response = requests.get(url_pabrik)
+            
+            if response.status_code == 200:
+                image_bytes = response.content
+                image = io.BytesIO(image_bytes)
+                image.name = 'hasil_gambar.jpg'
                 
-                if response.status_code == 200:
-                    image_bytes = response.content
-                    image = io.BytesIO(image_bytes)
-                    image.name = 'hasil_gambar.jpg'
-                    
-                    await update.message.reply_photo(
-                        photo=image, 
-                        caption=f"✨ Berhasil! Ini gambarmu untuk:\n_{text}_", 
-                        parse_mode="Markdown"
-                    )
-                    await processing_msg.delete()
-                    break # Keluar dari loop karena sukses
-                    
-                elif response.status_code == 503:
-                    # Server lagi tidur (Cold Start), kita paksa bot nunggu
-                    try:
-                        estimasi_waktu = response.json().get('estimated_time', 20)
-                    except:
-                        estimasi_waktu = 20
-                        
-                    await processing_msg.edit_text(f"⏳ Server lagi bangun tidur nih... Tunggu sekitar {int(estimasi_waktu)} detik ya. (Mencoba ulang {i+1}/{maks_percobaan})")
-                    await asyncio.sleep(estimasi_waktu) # Bot sabar menunggu
-                else:
-                    await processing_msg.edit_text(f"❌ Server ngasih Error: {response.status_code}")
-                    break
+                # Kirim hasilnya ke Telegram!
+                await update.message.reply_photo(
+                    photo=image, 
+                    caption=f"✨ Berhasil dari Pabrik Sendiri! Ini gambarmu untuk:\n_{text}_", 
+                    parse_mode="Markdown"
+                )
+                await processing_msg.delete()
             else:
-                await processing_msg.edit_text("❌ Udah ditungguin tapi pelukisnya tetep tidur pulas. Coba lagi nanti ya.")
+                # Kalau error, pabriknya ngasih tau pesannya
+                pesan_error = response.text
+                await processing_msg.edit_text(f"❌ Pabrik lagi macet: {pesan_error}")
                 
         except Exception as e:
-            print("ERROR GAMBAR:", e)
-            await processing_msg.edit_text("❌ Gagal membuat gambar. Cek terminal/Railway.")
-
+            print("ERROR PABRIK GAMBAR:", e)
+            await processing_msg.edit_text("❌ Gagal menghubungi pabrik. Cek terminal/Railway.")
 # ===== RUNNING BOT =====
 if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).build()
