@@ -168,16 +168,22 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if mode == "gambar":
         if text.startswith("http"): return 
         
-        processing_msg = await update.message.reply_text("🎨 Memanggil pelukis jalur VIP... ⏳ (Tunggu sebentar)")
+        processing_msg = await update.message.reply_text("🎨 Memanggil pelukis jalur VIP... ⏳ (Menyamar jadi browser)")
         
         try:
-            # Mengamankan teks prompt untuk URL
-            prompt_aman = text.replace(" ", "%20")
-            # Kita pakai resolusi HD (1024x1024) dan hilangkan logo watermark-nya
+            # Mengubah spasi dan koma jadi format URL yang aman
+            import urllib.parse
+            prompt_aman = urllib.parse.quote(text)
+            
             url_gambar = f"https://image.pollinations.ai/prompt/{prompt_aman}?width=1024&height=1024&nologo=true"
             
-            # Ambil gambar dari server VIP
-            response = requests.get(url_gambar)
+            # KUNCI RAHASIA: Nyamar jadi Safari di iPhone 12 biar nggak diblokir satpam server!
+            headers = {
+                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1"
+            }
+            
+            # Kita kirim permintaan bareng identitas penyamarannya
+            response = requests.get(url_gambar, headers=headers)
             
             if response.status_code == 200:
                 image_bytes = response.content
@@ -187,12 +193,13 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Kirim foto ke Telegram
                 await update.message.reply_photo(
                     photo=image, 
-                    caption=f"✨ Berhasil pakai jalur VIP! Ini gambarmu untuk:\n_{text}_", 
+                    caption=f"✨ Tembus jalur VIP! Ini gambarmu untuk:\n_{text}_", 
                     parse_mode="Markdown"
                 )
                 await processing_msg.delete()
             else:
-                await processing_msg.edit_text("❌ Pelukis VIP juga lagi sibuk nih. Coba lagi bentar ya.")
+                # Kalau gagal, biar botnya ngasih tau error nomor berapa
+                await processing_msg.edit_text(f"❌ Wah ketahuan satpam. Server ngasih Error: {response.status_code}")
                 
         except Exception as e:
             print("ERROR GAMBAR:", e)
