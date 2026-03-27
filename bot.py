@@ -153,31 +153,57 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.delete()
         except: await msg.edit_text("❌ Pabrik gambar macet.")
 
-   # C. LOGIKA CHAT AI (GROQ DENGAN MEMORY & SYSTEM PROMPT) 🧠
+   # C. LOGIKA CHAT AI (GROQ DENGAN MEMORY & WEB SEARCH) 🌐🧠
     elif mode == "ai":
         msg = await update.message.reply_text("🤖 Berpikir...")
         try:
-            # 1. Instruksi "God Mode" (Kepribadian AI)
+            text_asli = text
+            # 1. TRIGGER BROWSING: Kalau chat dimulai dengan "cari " atau "search "
+            if text.lower().startswith("cari ") or text.lower().startswith("search "):
+                query = text.split(" ", 1)[1] # Ambil kata kunci pencarian
+                await msg.edit_text("🌐 Sedang berselancar di internet mencari data terbaru...")
+                
+                # Proses Browsing
+                hasil_search = ""
+                try:
+                    from duckduckgo_search import DDGS
+                    with DDGS() as ddgs:
+                        # Ambil 3 artikel teratas dari Google/DuckDuckGo
+                        results = list(ddgs.text(query, max_results=3))
+                        for r in results:
+                            hasil_search += f"- {r['title']}: {r['body']}\n"
+                except Exception as e:
+                    print(f"Error Browsing: {e}")
+                    hasil_search = "Gagal mengambil data dari internet."
+                
+                # Suntikkan hasil internet ke otak Llama 3.3
+                text = f"Tolong jawab pertanyaanku: '{text_asli}'. Ini ada data terbaru dari internet yang baru saja ku-search, tolong rangkum dan jadikan referensi utama jawabanmu. Jangan sebutkan kalau kamu disuntik data ini:\n\n{hasil_search}"
+
+            # 2. System Prompt (Kepribadian)
             system_prompt = {
                 "role": "system",
-                "content": "Kamu adalah Ipun Assistant, sebuah AI tingkat lanjut yang jenius layaknya asisten tech profesional. Kamu sangat ahli dalam pemrograman, teknologi, dan sinematografi/video editing. Gaya bahasamu santai, asyik, tapi sangat tajam dan solutif. Jangan pernah bilang kamu AI buatan OpenAI atau Groq. Posisikan dirimu sebagai partner kerja andalan."
+                "content": "Kamu adalah Ipun Assistant, AI jenius dan asisten tech profesional. Jawablah dengan bahasa yang santai, asyik, dan tajam. Jika user bertanya hal terbaru dan kamu mendapat referensi data internet di prompt, gunakan data itu seolah-olah kamu memang selalu update informasi terkini."
             }
             
-            # 2. Ambil History Obrolan
+            # 3. Kelola Memory
             history = user_chat_history.get(user_id, [])
             history.append({"role": "user", "content": text})
             if len(history) > 10: history = history[-10:]
             
-            # 3. Gabungkan System Prompt (Harus ditaruh paling atas!)
+            # Gabung System Prompt + History
             pesan_ke_groq = [system_prompt] + history
             
-            # 4. Kirim ke Otak Groq
+            # 4. Tembak ke API Groq
             h = {"Authorization": f"Bearer {GROQ_API_KEY}"}
             p = {"model": "llama-3.3-70b-versatile", "messages": pesan_ke_groq}
             r = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, json=p).json()
             
-            # 5. Ekstrak Jawaban
             jawaban = r['choices'][0]['message']['content']
+            
+            # Bersihkan memory (Biar file internet nggak menuh-menuhin RAM bot kamu)
+            if text_asli.lower().startswith("cari ") or text_asli.lower().startswith("search "):
+                history[-1] = {"role": "user", "content": text_asli}
+                
             history.append({"role": "assistant", "content": jawaban})
             user_chat_history[user_id] = history
             
