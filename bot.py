@@ -95,79 +95,77 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if not mode: return await update.message.reply_text("💡 Pilih mode dulu di /start!", reply_markup=get_main_menu())
 
-    # A. LOGIKA DOWNLOAD
+    # A. LOGIKA DOWNLOAD (VIDEO & AUDIO)
     if text.startswith("http"):
-        if mode not in ["video", "audio"]: return await update.message.reply_text("⚠️ Aktifkan Mode Video/MP3 dulu.")
+        if mode not in ["video", "audio"]: 
+            return await update.message.reply_text("⚠️ Aktifkan Mode Video/MP3 dulu.")
+        
         msg = await update.message.reply_text("⏳ Memproses link...")
         try:
+            # --- MODE AUDIO (METADATA PRO) ---
             if mode == "audio":
-                # 1. Setup opsi download
                 opts = {
                     'format': 'bestaudio/best',
                     'outtmpl': 'out.%(ext)s',
                     'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3'}],
                     'quiet': True
                 }
-                
-                # 2. Tarik info judul & uploader dulu, baru download
                 with yt_dlp.YoutubeDL(opts) as ydl:
                     info = ydl.extract_info(text, download=True)
                     judul = info.get('title', 'Audio Ipun Bot')
                     penyanyi = info.get('uploader', 'Unknown Artist')
                 
-                # 3. Kirim MP3 dengan metadata asli
                 await update.message.reply_audio(
                     audio=open("out.mp3", "rb"),
-                    title=judul,
-                    performer=penyanyi,
-                    filename=f"{judul}.mp3" # Nama file jadi rapi saat di-save
+                    title=judul, performer=penyanyi, filename=f"{judul}.mp3"
                 )
-                
                 if os.path.exists("out.mp3"): os.remove("out.mp3")
 
+            # --- MODE VIDEO (CAPTION PRO) ---
+            elif mode == "video":
+                opts = {'format': 'best', 'outtmpl': 'out.mp4', 'quiet': True}
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    info = ydl.extract_info(text, download=True)
+                    judul = info.get('title', 'Video Ipun Bot')
+                    kreator = info.get('uploader', 'Unknown Creator')
+                    link_asli = info.get('webpage_url', text)
+                
+                caption_teks = f"🎬 **{judul}**\n👤 Creator: `{kreator}`\n\n🔗 [Original Link]({link_asli})"
+                
+                await update.message.reply_video(
+                    video=open("out.mp4", "rb"),
+                    caption=caption_teks, parse_mode="Markdown"
+                )
+                if os.path.exists("out.mp4"): os.remove("out.mp4")
                 
             await msg.delete()
-        except Exception as e: 
-            print(f"Error Download: {e}") # Biar kalau error lagi, ketahuan penyakitnya di Railway Logs
+        except Exception as e:
+            print(f"Download Error: {e}")
             await msg.edit_text("❌ Gagal download.")
         return
-
     
     # B. LOGIKA BUAT GAMBAR
     elif mode == "gambar":
         msg = await update.message.reply_text("🎨 Pabrik sedang melukis... ⏳")
         try:
             r = requests.get(f"https://ipun-pelukis.tipungsinoman.workers.dev/?prompt={text}")
-            await update.message.reply_photo(io.BytesIO(r.content), caption=f"✨Super Bot PRO | Image Generation\nPrompt: {text}")
+            await update.message.reply_photo(io.BytesIO(r.content), caption=f"Ipun Bot PRO | Image Generation\nPrompt: {text}")
             await msg.delete()
         except: await msg.edit_text("❌ Pabrik gambar macet.")
 
-    # C. LOGIKA CHAT AI (GROQ DENGAN MEMORY) 🧠
+    # C. LOGIKA CHAT AI (GROQ DENGAN MEMORY)
     elif mode == "ai":
         msg = await update.message.reply_text("🤖 Berpikir...")
         try:
-            # 1. Ambil History Obrolan User
             history = user_chat_history.get(user_id, [])
-            
-            # 2. Tambahkan Pesan Baru ke History
             history.append({"role": "user", "content": text})
-            
-            # 3. Batasi History (Max 10 pesan terakhir) biar server nggak berat
             if len(history) > 10: history = history[-10:]
-            
-            # 4. Kirim History Lengkap ke Groq AI
             h = {"Authorization": f"Bearer {GROQ_API_KEY}"}
             p = {"model": "llama-3.3-70b-versatile", "messages": history}
             r = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, json=p).json()
-            
-            # 5. Ambil Jawaban AI
             jawaban = r['choices'][0]['message']['content']
-            
-            # 6. Tambahkan Jawaban AI ke History
             history.append({"role": "assistant", "content": jawaban})
             user_chat_history[user_id] = history
-            
-            # 7. Kirim Jawaban ke Telegram
             await msg.edit_text(jawaban[:4000])
         except: await msg.edit_text("❌ Otak AI sedang error.")
 
