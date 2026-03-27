@@ -101,27 +101,30 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = await update.message.reply_text("⏳ Memproses link...")
         try:
             if mode == "audio":
-                # Resep baru biar anti-gagal di TikTok
+                # 1. Setup opsi download
                 opts = {
                     'format': 'bestaudio/best',
                     'outtmpl': 'out.%(ext)s',
                     'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3'}],
                     'quiet': True
                 }
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    ydl.download([text])
                 
-                # Kirim hasil MP3
-                await update.message.reply_audio(open("out.mp3", "rb"))
+                # 2. Tarik info judul & uploader dulu, baru download
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    info = ydl.extract_info(text, download=True)
+                    judul = info.get('title', 'Audio Ipun Bot')
+                    penyanyi = info.get('uploader', 'Unknown Artist')
+                
+                # 3. Kirim MP3 dengan metadata asli
+                await update.message.reply_audio(
+                    audio=open("out.mp3", "rb"),
+                    title=judul,
+                    performer=penyanyi,
+                    filename=f"{judul}.mp3" # Nama file jadi rapi saat di-save
+                )
+                
                 if os.path.exists("out.mp3"): os.remove("out.mp3")
 
-            elif mode == "video":
-                with yt_dlp.YoutubeDL({'format':'best','outtmpl':'out.mp4'}) as ydl:
-                    ydl.download([text])
-                
-                # Kirim hasil Video
-                await update.message.reply_video(open("out.mp4", "rb"))
-                if os.path.exists("out.mp4"): os.remove("out.mp4")
                 
             await msg.delete()
         except Exception as e: 
