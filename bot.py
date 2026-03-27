@@ -167,14 +167,24 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 hasil_search = ""
                 try:
                     from duckduckgo_search import DDGS
+                    import datetime
+                    
+                    # Kita paksa cari berita terbaru (timelimit='w' artinya 1 minggu terakhir)
                     with DDGS() as ddgs:
-                        # Ambil 3 artikel teratas dari Google/DuckDuckGo
-                        results = list(ddgs.text(query, max_results=3))
+                        results = list(ddgs.text(query, max_results=3, timelimit='w'))
                         for r in results:
                             hasil_search += f"- {r['title']}: {r['body']}\n"
+                            
+                    # Ambil tanggal hari ini biar AI nggak bingung tahun
+                    hari_ini = datetime.datetime.now().strftime("%d %B %Y")
+                    
+                    # Suntikkan hasil internet dan tanggal ke otak AI
+                    text = f"Hari ini adalah tanggal {hari_ini}. Tolong jawab pertanyaanku: '{text_asli}'. Ini ada data terbaru dari internet, tolong jadikan referensi utama jawabanmu. Jika data internet kosong, bilang saja kamu tidak bisa mengakses internet saat ini:\n\n{hasil_search}"
+                    
                 except Exception as e:
                     print(f"Error Browsing: {e}")
-                    hasil_search = "Gagal mengambil data dari internet."
+                    text = f"Tolong jawab pertanyaanku: '{text_asli}'. (Catatan sistem: Gagal mengambil data internet terbaru, tolong beritahu user bahwa fitur browsing sedang error)."
+
                 
                 # Suntikkan hasil internet ke otak Llama 3.3
                 text = f"Tolong jawab pertanyaanku: '{text_asli}'. Ini ada data terbaru dari internet yang baru saja ku-search, tolong rangkum dan jadikan referensi utama jawabanmu. Jangan sebutkan kalau kamu disuntik data ini:\n\n{hasil_search}"
