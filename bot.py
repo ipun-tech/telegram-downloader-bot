@@ -163,33 +163,42 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 query = text.split(" ", 1)[1] # Ambil kata kunci pencarian
                 await msg.edit_text("🌐 Sedang berselancar di internet mencari data terbaru...")
                 
-                # Proses Browsing
+                # Proses Browsing Menggunakan Tavily API (Pro Mode)
                 hasil_search = ""
                 try:
-                    from duckduckgo_search import DDGS
+                    import os
+                    import requests
                     import datetime
                     
-                    with DDGS() as ddgs:
-                        # Terkadang timelimit bikin error di library, kita copot dulu
-                        results = list(ddgs.text(query, max_results=3))
-                        for r in results:
-                            # Ambil link-nya juga biar ketahuan sumbernya
-                            hasil_search += f"- Sumber: {r.get('href', 'Tidak ada link')}\nIsi: {r.get('body', '')}\n\n"
+                    tavily_key = os.environ.get("TAVILY_API_KEY", "")
                     
-                    # --- MODE SINAR-X: Tampilkan hasil mentah ke Telegram ---
-                    if hasil_search.strip() == "":
-                        await msg.edit_text("⚠️ Waduh, DuckDuckGo nggak nemu apa-apa (Kosong). AI terpaksa nebak nih...")
+                    if tavily_key:
+                        # Tembak langsung ke server Tavily
+                        payload = {
+                            "api_key": tavily_key,
+                            "query": query,
+                            "search_depth": "basic",
+                            "include_answer": False,
+                            "max_results": 3
+                        }
+                        res = requests.post("https://api.tavily.com/search", json=payload).json()
+                        
+                        # Ekstrak data bersih
+                        for item in res.get('results', []):
+                            hasil_search += f"- Sumber: {item.get('url', '')}\n  Isi: {item.get('content', '')}\n\n"
+                        
+                        await msg.edit_text("🌐 Sedang menarik data akurat dari API Pencarian...")
                     else:
-                        await msg.edit_text(f"🔍 Dapet data dari internet:\n{hasil_search[:300]}...\n\n🤖 Sedang merangkum...")
-                    # --------------------------------------------------------
-                            
+                        await msg.edit_text("⚠️ Kunci API Tavily belum dipasang di Railway!")
+                        hasil_search = "Data internet kosong karena API Key tidak ada."
+                        
+                    # Suntik ke otak Llama 3.3
                     hari_ini = datetime.datetime.now().strftime("%d %B %Y")
-                    
-                    text = f"Hari ini adalah tanggal {hari_ini}. Tolong jawab pertanyaanku: '{text_asli}'. Ini ada data terbaru dari internet:\n\n{hasil_search}\n\nJawab STRICT berdasarkan data di atas. Jika datanya kosong, bilang kamu tidak tahu."
+                    text = f"Hari ini tanggal {hari_ini}. Tolong jawab pertanyaanku: '{text_asli}'. Ini data bersih dari internet:\n\n{hasil_search}\n\nJawab STRICT berdasarkan data di atas. Gunakan gaya bahasa asisten jenius."
                     
                 except Exception as e:
-                    print(f"Error Browsing: {e}")
-                    await msg.edit_text(f"❌ Internet Bot Error: {e}")
+                    print(f"Error Tavily: {e}")
+                    await msg.edit_text(f"❌ API Search Error.")
                     text = f"Tolong jawab: '{text_asli}'. (Catatan: internet error)."
                 
                 # Suntikkan hasil internet ke otak Llama 3.3
