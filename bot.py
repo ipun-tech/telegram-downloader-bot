@@ -153,21 +153,38 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.delete()
         except: await msg.edit_text("❌ Pabrik gambar macet.")
 
-    # C. LOGIKA CHAT AI (GROQ DENGAN MEMORY)
+   # C. LOGIKA CHAT AI (GROQ DENGAN MEMORY & SYSTEM PROMPT) 🧠
     elif mode == "ai":
         msg = await update.message.reply_text("🤖 Berpikir...")
         try:
+            # 1. Instruksi "God Mode" (Kepribadian AI)
+            system_prompt = {
+                "role": "system",
+                "content": "Kamu adalah Ipun Assistant, sebuah AI tingkat lanjut yang jenius layaknya asisten tech profesional. Kamu sangat ahli dalam pemrograman, teknologi, dan sinematografi/video editing. Gaya bahasamu santai, asyik, tapi sangat tajam dan solutif. Jangan pernah bilang kamu AI buatan OpenAI atau Groq. Posisikan dirimu sebagai partner kerja andalan."
+            }
+            
+            # 2. Ambil History Obrolan
             history = user_chat_history.get(user_id, [])
             history.append({"role": "user", "content": text})
             if len(history) > 10: history = history[-10:]
+            
+            # 3. Gabungkan System Prompt (Harus ditaruh paling atas!)
+            pesan_ke_groq = [system_prompt] + history
+            
+            # 4. Kirim ke Otak Groq
             h = {"Authorization": f"Bearer {GROQ_API_KEY}"}
-            p = {"model": "llama-3.3-70b-versatile", "messages": history}
+            p = {"model": "llama-3.3-70b-versatile", "messages": pesan_ke_groq}
             r = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, json=p).json()
+            
+            # 5. Ekstrak Jawaban
             jawaban = r['choices'][0]['message']['content']
             history.append({"role": "assistant", "content": jawaban})
             user_chat_history[user_id] = history
+            
             await msg.edit_text(jawaban[:4000])
-        except: await msg.edit_text("❌ Otak AI sedang error.")
+        except Exception as e: 
+            print(f"Error AI: {e}")
+            await msg.edit_text("❌ Otak AI sedang pusing.")
 
 # ===== RUNNING BOT =====
 if __name__ == '__main__':
