@@ -4,3 +4,4 @@ requests
 static-ffmpeg
 numpy
 colorthief
+duckduckgo-search
