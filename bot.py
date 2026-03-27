@@ -169,22 +169,28 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     from duckduckgo_search import DDGS
                     import datetime
                     
-                    # Kita paksa cari berita terbaru (timelimit='w' artinya 1 minggu terakhir)
                     with DDGS() as ddgs:
-                        results = list(ddgs.text(query, max_results=3, timelimit='w'))
+                        # Terkadang timelimit bikin error di library, kita copot dulu
+                        results = list(ddgs.text(query, max_results=3))
                         for r in results:
-                            hasil_search += f"- {r['title']}: {r['body']}\n"
+                            # Ambil link-nya juga biar ketahuan sumbernya
+                            hasil_search += f"- Sumber: {r.get('href', 'Tidak ada link')}\nIsi: {r.get('body', '')}\n\n"
+                    
+                    # --- MODE SINAR-X: Tampilkan hasil mentah ke Telegram ---
+                    if hasil_search.strip() == "":
+                        await msg.edit_text("⚠️ Waduh, DuckDuckGo nggak nemu apa-apa (Kosong). AI terpaksa nebak nih...")
+                    else:
+                        await msg.edit_text(f"🔍 Dapet data dari internet:\n{hasil_search[:300]}...\n\n🤖 Sedang merangkum...")
+                    # --------------------------------------------------------
                             
-                    # Ambil tanggal hari ini biar AI nggak bingung tahun
                     hari_ini = datetime.datetime.now().strftime("%d %B %Y")
                     
-                    # Suntikkan hasil internet dan tanggal ke otak AI
-                    text = f"Hari ini adalah tanggal {hari_ini}. Tolong jawab pertanyaanku: '{text_asli}'. Ini ada data terbaru dari internet, tolong jadikan referensi utama jawabanmu. Jika data internet kosong, bilang saja kamu tidak bisa mengakses internet saat ini:\n\n{hasil_search}"
+                    text = f"Hari ini adalah tanggal {hari_ini}. Tolong jawab pertanyaanku: '{text_asli}'. Ini ada data terbaru dari internet:\n\n{hasil_search}\n\nJawab STRICT berdasarkan data di atas. Jika datanya kosong, bilang kamu tidak tahu."
                     
                 except Exception as e:
                     print(f"Error Browsing: {e}")
-                    text = f"Tolong jawab pertanyaanku: '{text_asli}'. (Catatan sistem: Gagal mengambil data internet terbaru, tolong beritahu user bahwa fitur browsing sedang error)."
-
+                    await msg.edit_text(f"❌ Internet Bot Error: {e}")
+                    text = f"Tolong jawab: '{text_asli}'. (Catatan: internet error)."
                 
                 # Suntikkan hasil internet ke otak Llama 3.3
                 text = f"Tolong jawab pertanyaanku: '{text_asli}'. Ini ada data terbaru dari internet yang baru saja ku-search, tolong rangkum dan jadikan referensi utama jawabanmu. Jangan sebutkan kalau kamu disuntik data ini:\n\n{hasil_search}"
