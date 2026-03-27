@@ -96,7 +96,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not mode: return await update.message.reply_text("💡 Pilih mode dulu di /start!", reply_markup=get_main_menu())
 
     # A. LOGIKA DOWNLOAD
-        if text.startswith("http"):
+    if text.startswith("http"):
         if mode not in ["video", "audio"]: return await update.message.reply_text("⚠️ Aktifkan Mode Video/MP3 dulu.")
         msg = await update.message.reply_text("⏳ Memproses link...")
         try:
