@@ -96,23 +96,39 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not mode: return await update.message.reply_text("💡 Pilih mode dulu di /start!", reply_markup=get_main_menu())
 
     # A. LOGIKA DOWNLOAD
-    if text.startswith("http"):
+        if text.startswith("http"):
         if mode not in ["video", "audio"]: return await update.message.reply_text("⚠️ Aktifkan Mode Video/MP3 dulu.")
         msg = await update.message.reply_text("⏳ Memproses link...")
         try:
             if mode == "audio":
-                with yt_dlp.YoutubeDL({'format':'bestaudio','outtmpl':'out.mp3','postprocessors':[{'key':'FFmpegExtractAudio','preferredcodec':'mp3'}]}) as ydl:
+                # Resep baru biar anti-gagal di TikTok
+                opts = {
+                    'format': 'bestaudio/best',
+                    'outtmpl': 'out.%(ext)s',
+                    'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3'}],
+                    'quiet': True
+                }
+                with yt_dlp.YoutubeDL(opts) as ydl:
                     ydl.download([text])
+                
+                # Kirim hasil MP3
                 await update.message.reply_audio(open("out.mp3", "rb"))
-                os.remove("out.mp3")
+                if os.path.exists("out.mp3"): os.remove("out.mp3")
+
             elif mode == "video":
                 with yt_dlp.YoutubeDL({'format':'best','outtmpl':'out.mp4'}) as ydl:
                     ydl.download([text])
+                
+                # Kirim hasil Video
                 await update.message.reply_video(open("out.mp4", "rb"))
-                os.remove("out.mp4")
+                if os.path.exists("out.mp4"): os.remove("out.mp4")
+                
             await msg.delete()
-        except: await msg.edit_text("❌ Gagal download.")
+        except Exception as e: 
+            print(f"Error Download: {e}") # Biar kalau error lagi, ketahuan penyakitnya di Railway Logs
+            await msg.edit_text("❌ Gagal download.")
         return
+
     
     # B. LOGIKA BUAT GAMBAR
     elif mode == "gambar":
