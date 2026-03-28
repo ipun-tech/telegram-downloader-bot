@@ -218,7 +218,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             history.append({"role": "assistant", "content": jawaban})
             user_chat_history[user_id] = history
             
-            await msg.edit_text(jawaban[:4000])
+            await msg.edit_text(jawaban[:4000], parse_mode="Markdown")
         except Exception as e: 
             print(f"Error AI: {e}")
             # Bot akan memunculkan detail errornya ke Telegram!
