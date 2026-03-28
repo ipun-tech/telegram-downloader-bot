@@ -185,18 +185,18 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     print(f"Error Tavily: {e}")
                     text = f"Tolong jawab: '{text_asli}'. (Catatan: internet sedang error)."
 
-            # 2. System Prompt (Kepribadian & Larangan Tabel)
+            # 2. System Prompt
             system_prompt = {
                 "role": "system",
                 "content": (
                     "Kamu adalah Ipun Assistant, AI jenius dan asisten tech profesional. "
                     "Jawablah dengan bahasa yang santai, asyik, dan tajam. "
-                    "PENTING: DILARANG KERAS menggunakan format TABEL TEKS (Markdown table "
-                    "seperti pakai simbol '|') karena tidak terbaca di Telegram HP. "
-                    "Gunakan format POIN-POIN (bullet points), LIST BERUNTUN, atau "
-                    "Sub-judul tebal (##) saja untuk menyajikan data yang terstruktur."
+                    "ATURAN MUTLAK: JANGAN PERNAH membuat tabel (Markdown table dengan simbol '|'). "
+                    "Ganti SEMUA format tabel menjadi List Beruntun (bullet points) atau sub-judul. "
+                    "Jika melanggar, sistem akan error."
                 )
             }
+
             
             # 3. Kelola Memory
             history = user_chat_history.get(user_id, [])
@@ -209,7 +209,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 4. Tembak ke API Groq
             import requests # Pastikan tools ini aktif untuk manggil Groq
             h = {"Authorization": f"Bearer {GROQ_API_KEY}"}
-            p = {"model": "openai/gpt-oss-120b", "messages": pesan_ke_groq}
+            p = {"model": "openai/gpt-oss-120b", "messages": pesan_ke_groq, "max_tokens": 3000}
             r = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, json=p).json()
             
             # Sinar-X: Cek apakah Groq menolak memproses
