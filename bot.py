@@ -202,7 +202,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 4. Tembak ke API Groq
             import requests # Pastikan tools ini aktif untuk manggil Groq
             h = {"Authorization": f"Bearer {GROQ_API_KEY}"}
-            p = {"model": "llama-3.3-70b-versatile", "messages": pesan_ke_groq}
+            p = {"model": "openai/gpt-oss-120b", "messages": pesan_ke_groq}
             r = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, json=p).json()
             
             # Sinar-X: Cek apakah Groq menolak memproses
