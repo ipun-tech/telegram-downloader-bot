@@ -153,17 +153,17 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.delete()
         except: await msg.edit_text("❌ Pabrik gambar macet.")
 
-   # C. LOGIKA CHAT AI (GROQ DENGAN MEMORY & WEB SEARCH) 🌐🧠
+    # C. LOGIKA CHAT AI (GROQ DENGAN MEMORY & WEB SEARCH)
     elif mode == "ai":
         msg = await update.message.reply_text("🤖 Berpikir...")
         try:
             text_asli = text
             # 1. TRIGGER BROWSING: Kalau chat dimulai dengan "cari " atau "search "
             if text.lower().startswith("cari ") or text.lower().startswith("search "):
-                query = text.split(" ", 1)[1] # Ambil kata kunci pencarian
-                await msg.edit_text("🌐 Sedang berselancar di internet mencari data terbaru...")
+                query = text.split(" ", 1)[1] # Ambil kata kunci
+                await msg.edit_text("🌐 Sedang menarik data akurat dari internet...")
                 
-                # Proses Browsing Menggunakan Tavily API (Pro Mode)
+                # Proses Browsing Tavily
                 hasil_search = ""
                 try:
                     import os
@@ -171,61 +171,47 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     import datetime
                     
                     tavily_key = os.environ.get("TAVILY_API_KEY", "")
-                    
                     if tavily_key:
-                        # Tembak langsung ke server Tavily
-                        payload = {
-                            "api_key": tavily_key,
-                            "query": query,
-                            "search_depth": "basic",
-                            "include_answer": False,
-                            "max_results": 3
-                        }
+                        payload = {"api_key": tavily_key, "query": query, "search_depth": "basic", "include_answer": False, "max_results": 3}
                         res = requests.post("https://api.tavily.com/search", json=payload).json()
-                        
-                        # Ekstrak data bersih
                         for item in res.get('results', []):
                             hasil_search += f"- Sumber: {item.get('url', '')}\n  Isi: {item.get('content', '')}\n\n"
-                        
-                        await msg.edit_text("🌐 Sedang menarik data akurat dari API Pencarian...")
                     else:
-                        await msg.edit_text("⚠️ Kunci API Tavily belum dipasang di Railway!")
-                        hasil_search = "Data internet kosong karena API Key tidak ada."
+                        hasil_search = "Data internet kosong karena API Key Tavily tidak ada."
                         
-                    # Suntik ke otak Llama 3.3
                     hari_ini = datetime.datetime.now().strftime("%d %B %Y")
-                    text = f"Hari ini tanggal {hari_ini}. Tolong jawab pertanyaanku: '{text_asli}'. Ini data bersih dari internet:\n\n{hasil_search}\n\nJawab STRICT berdasarkan data di atas. Gunakan gaya bahasa asisten jenius."
-                    
+                    text = f"Hari ini tanggal {hari_ini}. Tolong jawab pertanyaanku: '{text_asli}'. Ini data dari internet:\n\n{hasil_search}\n\nJawab STRICT berdasarkan data di atas."
                 except Exception as e:
                     print(f"Error Tavily: {e}")
-                    await msg.edit_text(f"❌ API Search Error.")
-                    text = f"Tolong jawab: '{text_asli}'. (Catatan: internet error)."
-                
-                # Suntikkan hasil internet ke otak Llama 3.3
-                text = f"Tolong jawab pertanyaanku: '{text_asli}'. Ini ada data terbaru dari internet yang baru saja ku-search, tolong rangkum dan jadikan referensi utama jawabanmu. Jangan sebutkan kalau kamu disuntik data ini:\n\n{hasil_search}"
+                    text = f"Tolong jawab: '{text_asli}'. (Catatan: internet sedang error)."
 
             # 2. System Prompt (Kepribadian)
             system_prompt = {
                 "role": "system",
-                "content": "Kamu adalah Ipun Assistant, AI jenius dan asisten tech profesional. Jawablah dengan bahasa yang santai, asyik, dan tajam. Jika user bertanya hal terbaru dan kamu mendapat referensi data internet di prompt, gunakan data itu seolah-olah kamu memang selalu update informasi terkini."
+                "content": "Kamu adalah Ipun Assistant, AI jenius dan asisten tech profesional. Jawablah dengan bahasa yang santai, asyik, dan tajam."
             }
             
             # 3. Kelola Memory
             history = user_chat_history.get(user_id, [])
             history.append({"role": "user", "content": text})
-            if len(history) > 10: history = history[-10:]
+            if len(history) > 10: history = history[-10:] # Batasi memori biar nggak kepenuhan
             
             # Gabung System Prompt + History
             pesan_ke_groq = [system_prompt] + history
             
             # 4. Tembak ke API Groq
+            import requests # Pastikan tools ini aktif untuk manggil Groq
             h = {"Authorization": f"Bearer {GROQ_API_KEY}"}
             p = {"model": "llama-3.3-70b-versatile", "messages": pesan_ke_groq}
             r = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, json=p).json()
             
+            # Sinar-X: Cek apakah Groq menolak memproses
+            if 'error' in r:
+                raise Exception(f"Groq API Error: {r['error']['message']}")
+                
             jawaban = r['choices'][0]['message']['content']
             
-            # Bersihkan memory (Biar file internet nggak menuh-menuhin RAM bot kamu)
+            # Bersihkan memory (agar text raksasa dari internet nggak tersimpan di riwayat)
             if text_asli.lower().startswith("cari ") or text_asli.lower().startswith("search "):
                 history[-1] = {"role": "user", "content": text_asli}
                 
@@ -235,7 +221,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.edit_text(jawaban[:4000])
         except Exception as e: 
             print(f"Error AI: {e}")
-            await msg.edit_text("❌ Otak AI sedang pusing.")
+            # Bot akan memunculkan detail errornya ke Telegram!
+            await msg.edit_text(f"❌ Otak AI sedang pusing.\nDetail Error: {str(e)[:150]}")
 
 # ===== RUNNING BOT =====
 if __name__ == '__main__':
