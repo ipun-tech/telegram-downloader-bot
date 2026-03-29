@@ -121,7 +121,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Siapkan History & Prompt
         history = user_chat_history.get(user_id, [])
-        prompt_pdf = f"Berikut adalah isi dokumen PDF:\n\n{teks_pdf}\n\nTolong berikan rangkuman utamanya dalam bentuk poin-poin yang rapi dan mudah dipahami!"
+        prompt_pdf = f"Bro, ini ada dokumen PDF nih:\n\n{teks_pdf}\n\nTolong bedah dan rangkum tugas atau materi ini pakai bahasa yang santai banget, luwes, dan gampang dicerna. Posisikan lu kayak temen tongkrongan yang lagi bantuin gue ngerjain tugas kampus. Bikin poin-poin utamanya aja, jangan pakai bahasa kaku atau bahasa robot ya!"
         
         # Masukin ke memori obrolan biar dia ingat lu habis kirim PDF
         history.append({"role": "user", "content": "Tolong rangkum dokumen PDF yang saya kirim ini."})
