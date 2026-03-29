@@ -154,7 +154,16 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         history.append({"role": "assistant", "content": jawaban})
         user_chat_history[user_id] = history
         
-        await msg.edit_text(jawaban[:4000], parse_mode="Markdown")
+        if len(jawaban) <= 4000:
+            await msg.edit_text(jawaban, parse_mode="Markdown")
+        else:
+            await msg.edit_text(jawaban[:4000] + "...\n\n*(Berlanjut ke pesan bawah 👇)*", parse_mode="Markdown")
+            for i in range(4000, len(jawaban), 4000):
+                potongan = jawaban[i:i+4000]
+                try:
+                    await context.bot.send_message(chat_id=user_id, text=potongan, parse_mode="Markdown")
+                except:
+                    await context.bot.send_message(chat_id=user_id, text=potongan)
         
     except Exception as e:
         print(f"Error PDF: {e}")
@@ -290,7 +299,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             history.append({"role": "assistant", "content": jawaban})
             user_chat_history[user_id] = history
             
-            await msg.edit_text(jawaban[:4000], parse_mode="Markdown")
+            if len(jawaban) <= 4000:
+            await msg.edit_text(jawaban, parse_mode="Markdown")
+        else:
+            await msg.edit_text(jawaban[:4000] + "...\n\n*(Berlanjut ke pesan bawah 👇)*", parse_mode="Markdown")
+            for i in range(4000, len(jawaban), 4000):
+                potongan = jawaban[i:i+4000]
+                try:
+                    await context.bot.send_message(chat_id=user_id, text=potongan, parse_mode="Markdown")
+                except:
+                    await context.bot.send_message(chat_id=user_id, text=potongan)
         except Exception as e: 
             print(f"Error AI: {e}")
             await msg.edit_text(f"❌ Otak AI sedang pusing.\nDetail Error: {str(e)[:150]}")
