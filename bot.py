@@ -112,9 +112,13 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for i in range(jml_halaman):
                 teks_pdf += pdf.pages[i].extract_text() + "\n"
                 
-        if os.path.exists(path_pdf): os.remove(path_pdf)
+       if os.path.exists(path_pdf): os.remove(path_pdf)
         
-        # Siapkan History & Prompt
+        if not teks_pdf.strip():
+            await msg.edit_text("❌ Waduh, aku nggak bisa baca teks di PDF ini. Kemungkinan besar ini PDF hasil scan (berupa gambar) atau teksnya dikunci. Coba kirim PDF teks biasa ya, Bos!")
+            return
+        
+        # Siapkan History & Prompt 
         history = user_chat_history.get(user_id, [])
         prompt_pdf = f"Berikut adalah isi dokumen PDF:\n\n{teks_pdf}\n\nTolong berikan rangkuman utamanya dalam bentuk poin-poin yang rapi dan mudah dipahami!"
         
