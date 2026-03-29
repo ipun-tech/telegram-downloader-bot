@@ -5,3 +5,4 @@ static-ffmpeg
 numpy
 colorthief
 duckduckgo-search
+PyPDF2
