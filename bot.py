@@ -181,7 +181,6 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for f in [path_in, path_out]:
                 if os.path.exists(f): os.remove(f)
         except: await msg.edit_text("❌ Gagal mengekstrak warna.")
-            return
         
 # --- 2. LOGIKA BACA PDF ---
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
