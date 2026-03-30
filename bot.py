@@ -1,4 +1,4 @@
-import os, yt_dlp, requests, asyncio, io, subprocess, PyPDF2
+import os, yt_dlp, requests, asyncio, io, subprocess, PyPDF2, base64
 from colorthief import ColorThief
 from static_ffmpeg import add_paths
 add_paths() 
@@ -33,7 +33,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_chat_history[user_id] = [] # Reset history saat start/reset
     
-    pesan = "✨ **Ipun Bot PRO v5.3**\n\nAsisten digitalmu sudah siap. Silakan pilih mode di bawah ini: 👇"
+    pesan = "✨ **Ipun Bot PRO v5.4 (Vision Edition)**\n\nAsisten digitalmu sudah siap. Silakan pilih mode di bawah ini: 👇"
     if update.message:
         await update.message.reply_text(pesan, parse_mode="Markdown", reply_markup=get_main_menu())
 
@@ -47,7 +47,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     modes = {
         "mode_video": ("video", "🎬 **Mode Video Aktif.**\nKirim link video (IG/TikTok/YT)."),
         "mode_audio": ("audio", "🎧 **Mode MP3 Aktif.**\nKirim link media."),
-        "mode_ai": ("ai", "🤖 **Mode Chat AI Aktif.**\nSilakan bertanya atau kirim Dokumen PDF!"),
+        "mode_ai": ("ai", "🤖 **Mode Chat AI Aktif.**\nSilakan bertanya, kirim Dokumen PDF, atau **Kirim Foto** untuk dianalisa!"),
         "mode_gambar": ("gambar", "🎨 **Mode Gambar Aktif.**\nKirim deskripsi visual (English)."),
         "mode_warna": ("warna", "🌈 **Mode Palet Warna Aktif.**\n\n📸 **Kirim Foto/Video** untuk mengekstrak warna.\n\n👇 Atau pakai **Referensi Palet Pro** ini:\n\n**1. Teal & Orange (Blockbuster)**\nHex: `#011936` | `#465362` | `#82A3A1` | `#E07A5F` | `#F4F1DE`\n\n**2. Cyberpunk (Neon Night)**\nHex: `#711C91` | `#EA00D9` | `#0ABDC6` | `#133E7C` | `#091833`\n\n**3. Moody Vintage (Retro / Kopi)**\nHex: `#2B3A24` | `#5A6650` | `#8C9A84` | `#D4D1C5` | `#8B5A33`\n\n*(💡 Tap Hex untuk copy ke CapCut/Photoshop)*"),
         "mode_reset": (None, "♻️ **Sesi direset.** Pilih mode baru:")
@@ -63,29 +63,92 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=get_main_menu())
 
-# --- 1. LOGIKA MEDIA (WARNA) ---
+# --- 1. LOGIKA MEDIA (WARNA & AI VISION) ---
 async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.user_data.get("mode") != "warna":
-        await update.message.reply_text("💡 Aktifkan **Mode Palet Warna** dulu ya!", reply_markup=get_main_menu())
+    mode = context.user_data.get("mode")
+    user_id = update.effective_user.id
+    
+    if mode not in ["warna", "ai"]:
+        await update.message.reply_text("💡 Aktifkan **Mode Palet Warna** atau **Mode Chat AI** dulu ya!", reply_markup=get_main_menu())
         return
-    msg = await update.message.reply_text("🕵️ Menganalisis palet warna... ⏳")
-    try:
-        file_id = update.message.photo[-1].file_id if update.message.photo else update.message.video.file_id
-        file = await context.bot.get_file(file_id)
-        path_in = "temp_in"
-        await file.download_to_drive(path_in)
-        path_out = "frame.jpg"
-        if update.message.video:
-            subprocess.run(['ffmpeg', '-y', '-i', path_in, '-ss', '00:00:01', '-vframes', '1', path_out], check=True)
-        else: path_out = path_in
-        palette = ColorThief(path_out).get_palette(color_count=5, quality=1)
-        res = "🎨 **Cinematic Color Palette Found!**\n\n"
-        for i, rgb in enumerate(palette):
-            res += f"{i+1}. `{'#%02x%02x%02x' % rgb}` 🟦\n"
-        await msg.edit_text(res + "\n*Tips:* Gunakan HEX ini di CapCut/Photoshop! 🚀", parse_mode="Markdown")
-        for f in [path_in, "frame.jpg"]:
-            if os.path.exists(f): os.remove(f)
-    except: await msg.edit_text("❌ Gagal mengekstrak warna.")
+
+    # A. LOGIKA AI VISION (BEDAH GAMBAR)
+    if mode == "ai":
+        if not update.message.photo:
+            return await update.message.reply_text("❌ Mode AI Vision saat ini hanya mendukung format Foto/Gambar, belum bisa Video.")
+            
+        msg = await update.message.reply_text("👀 Sedang menatap dan menganalisa gambar... ⏳")
+        try:
+            # Ambil foto resolusi tertinggi
+            file_id = update.message.photo[-1].file_id
+            file = await context.bot.get_file(file_id)
+            
+            # Download dan ubah ke format Base64 (Format yang dibaca AI)
+            image_stream = io.BytesIO()
+            await file.download_to_memory(out=image_stream)
+            base64_image = base64.b64encode(image_stream.getvalue()).decode('utf-8')
+            
+            # Ambil caption/pesan yang diketik user barengan sama foto
+            caption = update.message.caption or "Tolong jelaskan secara detail apa yang ada di gambar ini."
+            
+            # Tembak ke Model Vision Groq (llama-3.2-90b-vision-preview)
+            h = {"Authorization": f"Bearer {GROQ_API_KEY}"}
+            p = {
+                "model": "llama-3.2-90b-vision-preview",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": caption},
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                        ]
+                    }
+                ],
+                "max_tokens": 2000
+            }
+            
+            r = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, json=p).json()
+            if 'error' in r: raise Exception(r['error']['message'])
+            
+            jawaban = r['choices'][0]['message']['content']
+            
+            # --- Solusi Teks Panjang (Bersambung) ---
+            if len(jawaban) <= 4000:
+                await msg.edit_text(jawaban, parse_mode="Markdown")
+            else:
+                await msg.edit_text(jawaban[:4000] + "...\n\n*(Berlanjut ke pesan bawah 👇)*", parse_mode="Markdown")
+                for i in range(4000, len(jawaban), 4000):
+                    potongan = jawaban[i:i+4000]
+                    try:
+                        await context.bot.send_message(chat_id=user_id, text=potongan, parse_mode="Markdown")
+                    except:
+                        await context.bot.send_message(chat_id=user_id, text=potongan)
+            
+        except Exception as e:
+            print(f"Vision Error: {e}")
+            await msg.edit_text(f"❌ Gagal menganalisa gambar.\nDetail: {str(e)[:150]}")
+        return
+
+    # B. LOGIKA EKSTRAK PALET WARNA
+    if mode == "warna":
+        msg = await update.message.reply_text("🕵️ Menganalisis palet warna... ⏳")
+        try:
+            file_id = update.message.photo[-1].file_id if update.message.photo else update.message.video.file_id
+            file = await context.bot.get_file(file_id)
+            path_in = f"temp_in_{user_id}"
+            await file.download_to_drive(path_in)
+            path_out = f"frame_{user_id}.jpg"
+            if update.message.video:
+                subprocess.run(['ffmpeg', '-y', '-i', path_in, '-ss', '00:00:01', '-vframes', '1', path_out], check=True)
+            else: path_out = path_in
+            palette = ColorThief(path_out).get_palette(color_count=5, quality=1)
+            res = "🎨 **Cinematic Color Palette Found!**\n\n"
+            for i, rgb in enumerate(palette):
+                res += f"{i+1}. `{'#%02x%02x%02x' % rgb}` 🟦\n"
+            await msg.edit_text(res + "\n*Tips:* Gunakan HEX ini di CapCut/Photoshop! 🚀", parse_mode="Markdown")
+            for f in [path_in, path_out]:
+                if os.path.exists(f): os.remove(f)
+        except: await msg.edit_text("❌ Gagal mengekstrak warna.")
 
 # --- 2. LOGIKA BACA PDF ---
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -123,7 +186,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         history = user_chat_history.get(user_id, [])
         prompt_pdf = f"Bro, ini ada dokumen PDF nih:\n\n{teks_pdf}\n\nTolong bedah dan rangkum tugas atau materi ini pakai bahasa yang santai banget, luwes, dan gampang dicerna. Posisikan lu kayak temen tongkrongan yang lagi bantuin gue ngerjain tugas kampus. Bikin poin-poin utamanya aja, jangan pakai bahasa kaku atau bahasa robot ya!"
         
-        # Masukin ke memori obrolan biar dia ingat lu habis kirim PDF
+        # Masukin ke memori obrolan
         history.append({"role": "user", "content": "Tolong rangkum dokumen PDF yang saya kirim ini."})
         if len(history) > 10: history = history[-10:]
         
@@ -138,7 +201,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         }
         
-        # Gabung semua buat ditembak ke Groq (Sisipkan teks asli PDF khusus di pengiriman ini)
+        # Gabung semua buat ditembak ke Groq
         pesan_ke_groq = [system_prompt] + history[:-1] + [{"role": "user", "content": prompt_pdf}]
         
         h = {"Authorization": f"Bearer {GROQ_API_KEY}"}
@@ -154,6 +217,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         history.append({"role": "assistant", "content": jawaban})
         user_chat_history[user_id] = history
         
+        # --- Solusi Teks Panjang (Bersambung) ---
         if len(jawaban) <= 4000:
             await msg.edit_text(jawaban, parse_mode="Markdown")
         else:
@@ -299,6 +363,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             history.append({"role": "assistant", "content": jawaban})
             user_chat_history[user_id] = history
             
+            # --- Solusi Teks Panjang (Bersambung) ---
             if len(jawaban) <= 4000:
                 await msg.edit_text(jawaban, parse_mode="Markdown")
             else:
@@ -319,7 +384,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_click))
     app.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO, handle_media))
-    app.add_handler(MessageHandler(filters.Document.PDF, handle_document)) # NEW: Sensor PDF
+    app.add_handler(MessageHandler(filters.Document.PDF, handle_document))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
-    print("🚀 Ipun Bot PRO v5.3 (Super Edition) Online!")
+    print("🚀 Ipun Bot PRO v5.4 (Vision Edition) Online!")
     app.run_polling(drop_pending_updates=True)
