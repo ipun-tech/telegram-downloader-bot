@@ -94,7 +94,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Tembak ke Model Vision Groq (llama-3.2-90b-vision-preview)
             h = {"Authorization": f"Bearer {GROQ_API_KEY}"}
             p = {
-                "model": "llama-3.2-90b-vision-preview",
+                "model": "llama-3.2-11b-vision-preview",
                 "messages": [
                     {
                         "role": "user",
