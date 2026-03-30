@@ -72,8 +72,18 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("💡 Aktifkan **Mode Palet Warna** atau **Mode Chat AI** dulu ya!", reply_markup=get_main_menu())
         return
 
+    # --- 1. LOGIKA MEDIA (WARNA & AI VISION) ---
+async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    mode = context.user_data.get("mode")
+    user_id = update.effective_user.id
+    
+    if mode not in ["warna", "ai"]:
+        await update.message.reply_text("💡 Aktifkan **Mode Palet Warna** atau **Mode Chat AI** dulu ya!", reply_markup=get_main_menu())
+        return
+
     # A. LOGIKA AI VISION (BEDAH GAMBAR)
     if mode == "ai":
+        # Pastikan ini beneran foto, bukan video atau media lain
         if not update.message.photo:
             return await update.message.reply_text("❌ Mode AI Vision saat ini hanya mendukung format Foto/Gambar, belum bisa Video.")
             
@@ -91,7 +101,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Ambil caption/pesan yang diketik user barengan sama foto
             caption = update.message.caption or "Tolong jelaskan secara detail apa yang ada di gambar ini."
             
-            # Tembak ke Model Vision Groq (llama-3.2-90b-vision-preview)
+            # Tembak ke Model Vision Groq (Llama-4 Scout)
             h = {"Authorization": f"Bearer {GROQ_API_KEY}"}
             p = {
                 "model": "meta-llama/llama-4-scout-17b-16e-instruct",
@@ -129,6 +139,28 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.edit_text(f"❌ Gagal menganalisa gambar.\nDetail: {str(e)[:150]}")
         return
 
+    # B. LOGIKA EKSTRAK PALET WARNA (Kode Asli Lu)
+    if mode == "warna":
+        # Di mode warna, kita terima video juga
+        msg = await update.message.reply_text("🕵️ Menganalisis palet warna... ⏳")
+        try:
+            file_id = update.message.photo[-1].file_id if update.message.photo else update.message.video.file_id
+            file = await context.bot.get_file(file_id)
+            path_in = f"temp_in_{user_id}"
+            await file.download_to_drive(path_in)
+            path_out = f"frame_{user_id}.jpg"
+            if update.message.video:
+                subprocess.run(['ffmpeg', '-y', '-i', path_in, '-ss', '00:00:01', '-vframes', '1', path_out], check=True)
+            else: path_out = path_in
+            palette = ColorThief(path_out).get_palette(color_count=5, quality=1)
+            res = "🎨 **Cinematic Color Palette Found!**\n\n"
+            for i, rgb in enumerate(palette):
+                res += f"{i+1}. `{'#%02x%02x%02x' % rgb}` 🟦\n"
+            await msg.edit_text(res + "\n*Tips:* Gunakan HEX ini di CapCut/Photoshop! 🚀", parse_mode="Markdown")
+            for f in [path_in, path_out]:
+                if os.path.exists(f): os.remove(f)
+        except: await msg.edit_text("❌ Gagal mengekstrak warna.")
+
     # B. LOGIKA EKSTRAK PALET WARNA
     if mode == "warna":
         msg = await update.message.reply_text("🕵️ Menganalisis palet warna... ⏳")
@@ -149,7 +181,8 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for f in [path_in, path_out]:
                 if os.path.exists(f): os.remove(f)
         except: await msg.edit_text("❌ Gagal mengekstrak warna.")
-
+            return
+        
 # --- 2. LOGIKA BACA PDF ---
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("mode") != "ai":
@@ -383,7 +416,8 @@ if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_click))
-    app.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO, handle_media))
+    app.add_handler(MessageHandler(filters.PHOTO & filters.Caption(), handle_media))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_media))
     app.add_handler(MessageHandler(filters.Document.PDF, handle_document))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
     print("🚀 Ipun Bot PRO v5.4 (Vision Edition) Online!")
