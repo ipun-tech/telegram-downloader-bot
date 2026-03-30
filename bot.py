@@ -124,9 +124,16 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # --- Solusi Teks Panjang (Bersambung) ---
             if len(jawaban) <= 4000:
-                await msg.edit_text(jawaban, parse_mode="Markdown")
+                try:
+                    await msg.edit_text(jawaban, parse_mode="Markdown")
+                except:
+                    await msg.edit_text(jawaban) # Fallback teks polosan kalau markdown cacat
             else:
-                await msg.edit_text(jawaban[:4000] + "...\n\n*(Berlanjut ke pesan bawah 👇)*", parse_mode="Markdown")
+                try:
+                    await msg.edit_text(jawaban[:4000] + "...\n\n*(Berlanjut ke pesan bawah 👇)*", parse_mode="Markdown")
+                except:
+                    await msg.edit_text(jawaban[:4000] + "...\n\n*(Berlanjut ke pesan bawah 👇)*")
+                    
                 for i in range(4000, len(jawaban), 4000):
                     potongan = jawaban[i:i+4000]
                     try:
