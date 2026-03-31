@@ -329,14 +329,24 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.edit_text("❌ Gagal download.")
         return
     
-    # B. LOGIKA BUAT GAMBAR
+        # B. LOGIKA BUAT GAMBAR (Upgrade ke Pollinations HD)
     elif mode == "gambar":
-        msg = await update.message.reply_text("🎨 Pabrik sedang melukis... ⏳")
+        msg = await update.message.reply_text("🎨 Pabrik HD Ipun Studio sedang melukis... ⏳")
         try:
-            r = requests.get(f"https://ipun-pelukis.tipungsinoman.workers.dev/?prompt={text}")
-            await update.message.reply_photo(io.BytesIO(r.content), caption=f"Ipun Bot PRO | Image Generation\nPrompt: {text}")
+            # Bumbu rahasia biar hasil gambarnya selalu konsisten, cinematic, & HD
+            bumbu_rahasia = "masterpiece, ultra-detailed, 8k resolution, cinematic lighting, photorealistic, sharp focus"
+            prompt_sakti = f"{text}, {bumbu_rahasia}"
+            
+            # Format URL Pollinations AI (Otomatis kotak 1024x1024 & tanpa watermark)
+            url_gambar = f"https://image.pollinations.ai/prompt/{prompt_sakti}?width=1024&height=1024&nologo=true"
+            
+            # Telegram kirim gambar langsung dari link, lebih enteng & cepet!
+            await update.message.reply_photo(photo=url_gambar, caption=f"🎨 **Ipun Studio AI**\nPrompt: {text}")
             await msg.delete()
-        except: await msg.edit_text("❌ Pabrik gambar macet.")
+        except Exception as e: 
+            print(f"Error Gambar: {e}")
+            await msg.edit_text("❌ Waduh, pabrik gambar lagi macet nih.")
+
 
     # C. LOGIKA CHAT AI (GROQ DENGAN MEMORY & WEB SEARCH)
     elif mode == "ai":
