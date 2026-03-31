@@ -329,34 +329,48 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.edit_text("❌ Gagal download.")
         return
     
-            # B. LOGIKA BUAT GAMBAR (Anti-Panik & Resolusi HD)
+                # B. LOGIKA BUAT GAMBAR (Ultimate HD - Model FLUX)
     elif mode == "gambar":
-        msg = await update.message.reply_text("🎨 Pabrik HD Ipun Studio sedang melukis... ⏳")
+        msg = await update.message.reply_text("🎨 Pabrik FLUX Ipun Studio sedang melukis (Kualitas Ultra HD)... ⏳")
         try:
-            # 1. Translate prompt ke Inggris otomatis (Biar AI lebih paham)
+            # 1. Translate prompt ke Inggris otomatis
             translate_url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=id&tl=en&dt=t&q={text}"
             translate_response = requests.get(translate_url).json()
             prompt_english = "".join([i[0] for i in translate_response[0]])
             
-            # 2. Tambahin bumbu HD & Cinematic
-            bumbu_rahasia = "masterpiece, ultra-detailed, photorealistic, cinematic lighting, sharp focus, 8k resolution"
+            # 2. Bumbu HD super tajam
+            bumbu_rahasia = "masterpiece, ultra-high definition, 8k resolution, highly detailed, sharp focus, cinematic lighting"
             prompt_sakti_final = f"{prompt_english}, {bumbu_rahasia}"
             
-            # 3. Request ke Pollinations dengan resolusi tinggi (1024x1024)
-            url_gambar = f"https://image.pollinations.ai/prompt/{prompt_sakti_final}?width=1024&height=1024&nologo=true"
+            # 3. RAHASIA BARU: Pakai model "FLUX" (Model AI terkuat & paling tajam saat ini)
+            url_gambar = f"https://image.pollinations.ai/prompt/{prompt_sakti_final}?width=1024&height=1024&nologo=true&model=flux"
             
-            # 4. Kirim gambar ke Telegram
-            await update.message.reply_photo(photo=url_gambar, caption=f"🎨 **Ipun Studio AI**\nPrompt: {text}")
+            # 4. Bot download gambar fisik
+            respon_gambar = requests.get(url_gambar)
             
-            # 5. Hapus pesan loading dengan AMAN (Kalau gagal dihapus, ubah jadi centang)
+            # 5. Kirim gambar biasa (buat preview cepat di chat)
+            await update.message.reply_photo(
+                photo=io.BytesIO(respon_gambar.content), 
+                caption=f"🎨 **Preview Model FLUX**\nPrompt: {text}\n*(Sedang mengirim versi file mentah anti-blur...)*"
+            )
+            
+            # 6. Kirim SEBAGAI DOKUMEN (Biar Telegram gak nge-compress/nge-blur gambarnya)
+            await update.message.reply_document(
+                document=io.BytesIO(respon_gambar.content),
+                filename=f"Ipun_Studio_HD_{text[:10]}.jpg",
+                caption="🔥 Ini file mentahnya, Bos! Zoom 100% dijamin anti-blur."
+            )
+            
+            # 7. Hapus pesan loading
             try:
                 await msg.delete()
             except:
-                await msg.edit_text("✅ Gambar berhasil dibuat!")
+                pass
                 
         except Exception as e: 
             print(f"Error Gambar: {e}")
             await msg.edit_text("❌ Waduh, pabrik gambar beneran macet nih.")
+
 
 
     # C. LOGIKA CHAT AI (GROQ DENGAN MEMORY & WEB SEARCH)
