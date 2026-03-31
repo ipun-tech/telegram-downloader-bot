@@ -329,23 +329,34 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.edit_text("❌ Gagal download.")
         return
     
-        # B. LOGIKA BUAT GAMBAR (Upgrade ke Pollinations HD)
+            # B. LOGIKA BUAT GAMBAR (Anti-Panik & Resolusi HD)
     elif mode == "gambar":
         msg = await update.message.reply_text("🎨 Pabrik HD Ipun Studio sedang melukis... ⏳")
         try:
-            # Bumbu rahasia biar hasil gambarnya selalu konsisten, cinematic, & HD
-            bumbu_rahasia = "masterpiece, ultra-detailed, 8k resolution, cinematic lighting, photorealistic, sharp focus"
-            prompt_sakti = f"{text}, {bumbu_rahasia}"
+            # 1. Translate prompt ke Inggris otomatis (Biar AI lebih paham)
+            translate_url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=id&tl=en&dt=t&q={text}"
+            translate_response = requests.get(translate_url).json()
+            prompt_english = "".join([i[0] for i in translate_response[0]])
             
-            # Format URL Pollinations AI (Otomatis kotak 1024x1024 & tanpa watermark)
-            url_gambar = f"https://image.pollinations.ai/prompt/{prompt_sakti}?width=1024&height=1024&nologo=true"
+            # 2. Tambahin bumbu HD & Cinematic
+            bumbu_rahasia = "masterpiece, ultra-detailed, photorealistic, cinematic lighting, sharp focus, 8k resolution"
+            prompt_sakti_final = f"{prompt_english}, {bumbu_rahasia}"
             
-            # Telegram kirim gambar langsung dari link, lebih enteng & cepet!
+            # 3. Request ke Pollinations dengan resolusi tinggi (1024x1024)
+            url_gambar = f"https://image.pollinations.ai/prompt/{prompt_sakti_final}?width=1024&height=1024&nologo=true"
+            
+            # 4. Kirim gambar ke Telegram
             await update.message.reply_photo(photo=url_gambar, caption=f"🎨 **Ipun Studio AI**\nPrompt: {text}")
-            await msg.delete()
+            
+            # 5. Hapus pesan loading dengan AMAN (Kalau gagal dihapus, ubah jadi centang)
+            try:
+                await msg.delete()
+            except:
+                await msg.edit_text("✅ Gambar berhasil dibuat!")
+                
         except Exception as e: 
             print(f"Error Gambar: {e}")
-            await msg.edit_text("❌ Waduh, pabrik gambar lagi macet nih.")
+            await msg.edit_text("❌ Waduh, pabrik gambar beneran macet nih.")
 
 
     # C. LOGIKA CHAT AI (GROQ DENGAN MEMORY & WEB SEARCH)
